@@ -1,0 +1,14 @@
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\bin\Debug\net8.0\Audio.exe
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\bin\Debug\net8.0\Audio.deps.json
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\bin\Debug\net8.0\Audio.runtimeconfig.json
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\bin\Debug\net8.0\Audio.dll
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\bin\Debug\net8.0\Audio.pdb
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.AssemblyInfoInputs.cache
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.AssemblyInfo.cs
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.csproj.CoreCompileInputs.cache
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.dll
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\refint\Audio.dll
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.pdb
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.genruntimeconfig.cache
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\ref\Audio.dll
