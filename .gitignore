@@ -2,3 +2,4 @@
 bin/
 build_out/
 x64/
+obj
