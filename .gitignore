@@ -1,2 +1,4 @@
 .vs
 bin/
+build_out/
+x64/

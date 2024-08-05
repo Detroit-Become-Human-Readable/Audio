@@ -12,3 +12,4 @@ C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug
 C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.pdb
 C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.genruntimeconfig.cache
 C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\ref\Audio.dll
+C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\obj\Debug\net8.0\Audio.sourcelink.json
