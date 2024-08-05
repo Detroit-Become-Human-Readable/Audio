@@ -8,6 +8,6 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = Audio
-build_property.ProjectDir = C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio2\Audio\
+build_property.ProjectDir = C:\Users\palit\OneDrive\Documentos\Programacion\C#\Detroit\Audio\Audio\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 

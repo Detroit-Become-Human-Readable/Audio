@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio2\\Audio\\Audio.csproj": {}
+    "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio\\Audio\\Audio.csproj": {}
   },
   "projects": {
-    "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio2\\Audio\\Audio.csproj": {
+    "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio\\Audio\\Audio.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio2\\Audio\\Audio.csproj",
+        "projectUniqueName": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio\\Audio\\Audio.csproj",
         "projectName": "Audio",
-        "projectPath": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio2\\Audio\\Audio.csproj",
+        "projectPath": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio\\Audio\\Audio.csproj",
         "packagesPath": "C:\\Users\\palit\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio2\\Audio\\obj\\",
+        "outputPath": "C:\\Users\\palit\\OneDrive\\Documentos\\Programacion\\C#\\Detroit\\Audio\\Audio\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
