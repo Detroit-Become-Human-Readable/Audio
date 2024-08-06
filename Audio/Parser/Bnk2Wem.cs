@@ -8,9 +8,15 @@ namespace Audio.Parser
 {
     public class Bnk2Wem
     {
-        public void BnkToWem()
+        public static void BnkToWem(string filePath)
         {
-            // WIP
+            if (!Path.Exists(filePath)) return;
+
+            string outputDir = Path.Combine("./wem/", Path.GetFileNameWithoutExtension(filePath));
+
+            Directory.CreateDirectory(outputDir);
+
+            BnkExtractorWrapper.ExtractBnkFile(filePath, outputDir, false, false);
         }
     }
 }

@@ -6,6 +6,12 @@
 #include <filesystem>
 #include <fstream>
 
+#ifdef _WIN32
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
+#endif
+
 extern "C" {
     struct Index {
         std::uint32_t id;
@@ -108,5 +114,5 @@ extern "C" {
         std::vector<std::int8_t> parameters;
     };
 
-    void ExtractBnkFile(const char* bnkFilePath, const char* outputDirectory, bool swapByteOrder, bool dumpObjects);
+    DLLEXPORT void ExtractBnkFile(const char* bnkFilePath, const char* outputDirectory, bool swapByteOrder, bool dumpObjects);
 }
