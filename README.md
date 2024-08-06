@@ -2,7 +2,9 @@
 [WIP] Extract playable audio files from Detroit: Become Human!
 
 ## Features
-1. Extract WEM
+1. Extract BNK
+2. Extract WEM
+   
 
 ## READ
 This tool is WIP! It doesn't work yet fully, any contribution is appreciated!!!
