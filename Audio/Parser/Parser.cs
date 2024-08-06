@@ -21,16 +21,15 @@ namespace Audio.Parser
 
             int count = 0;
 
-            long[] name_offsets = SearchPattern(file, bnkNamePattern);
-            long[] offsets = SearchPattern(file, bnkPattern);
+            long[] nameOffsets = SearchPattern(data, bnkNamePattern);
+            long[] offsets = SearchPattern(data, bnkPattern);
 
-
-            foreach (long n_offset in name_offsets)
+            foreach (long nOffset in nameOffsets)
             {
-                using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read))
-                using (BinaryReader reader = new BinaryReader(fs))
+                using (MemoryStream ms = new MemoryStream(data))
+                using (BinaryReader reader = new BinaryReader(ms))
                 {
-                    fs.Seek(n_offset + 8, SeekOrigin.Begin);
+                    ms.Seek(nOffset + 8, SeekOrigin.Begin);
                     reader.ReadInt32();
                     reader.ReadInt32();
                     int length = reader.ReadInt32();
@@ -46,12 +45,12 @@ namespace Audio.Parser
             {
                 List<byte> bank = new List<byte>();
 
-                using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read))
-                using (BinaryReader reader = new BinaryReader(fs))
+                using (MemoryStream ms = new MemoryStream(data))
+                using (BinaryReader reader = new BinaryReader(ms))
                 {
-                    fs.Seek(offset, SeekOrigin.Begin);
+                    ms.Seek(offset, SeekOrigin.Begin);
 
-                    while (fs.Position < fs.Length)
+                    while (ms.Position < ms.Length)
                     {
                         byte currentByte = reader.ReadByte();
                         if (currentByte == 0x2D)
@@ -74,16 +73,7 @@ namespace Audio.Parser
                     }
                 }
 
-                string filename = "";
-
-                try
-                {
-                    filename = names.ToArray()[count];
-                }
-                catch (Exception ex)
-                {
-                    filename = $"UNK_BANK_{count}";
-                }
+                string filename = names.ElementAtOrDefault(count) ?? $"UNK_BANK_{count}";
 
                 string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
                 File.WriteAllBytes(outputFilePath, FixBank(bank.ToArray()));
@@ -121,42 +111,34 @@ namespace Audio.Parser
                 }
             }
 
-            return [0];
+            return new byte[0];
         }
 
-        public static long[] SearchPattern(string filePath, byte[] pattern)
+        public static long[] SearchPattern(byte[] data, byte[] pattern)
         {
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            if (data == null || data.Length == 0)
+                throw new ArgumentException("Data cannot be null or empty.", nameof(data));
 
             if (pattern == null || pattern.Length == 0)
                 throw new ArgumentException("Pattern cannot be null or empty.", nameof(pattern));
 
             List<long> offsets = new List<long>();
 
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            for (long i = 0; i <= data.Length - pattern.Length; i++)
             {
-                long fileLength = fileStream.Length;
-                byte[] buffer = new byte[fileLength];
-
-                fileStream.Read(buffer, 0, (int)fileLength);
-
-                for (long i = 0; i <= fileLength - pattern.Length; i++)
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++)
                 {
-                    bool match = true;
-                    for (int j = 0; j < pattern.Length; j++)
+                    if (data[i + j] != pattern[j])
                     {
-                        if (buffer[i + j] != pattern[j])
-                        {
-                            match = false;
-                            break;
-                        }
+                        match = false;
+                        break;
                     }
+                }
 
-                    if (match)
-                    {
-                        offsets.Add(i);
-                    }
+                if (match)
+                {
+                    offsets.Add(i);
                 }
             }
 
