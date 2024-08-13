@@ -13,71 +13,115 @@ namespace Audio.Parser
         {
             List<string> names = new List<string>();
 
-            byte[] bnkPattern = Convert.FromHexString("43534E44424B4454");
-            byte[] bnkNamePattern = Convert.FromHexString("43534E44424E4B5F");
-            byte[] data = File.ReadAllBytes(file);
-
-            Directory.CreateDirectory("banks");
-
-            int count = 0;
-
-            long[] nameOffsets = SearchPattern(data, bnkNamePattern);
-            long[] offsets = SearchPattern(data, bnkPattern);
-
-            foreach (long nOffset in nameOffsets)
+            try
             {
-                using (MemoryStream ms = new MemoryStream(data))
-                using (BinaryReader reader = new BinaryReader(ms))
+                byte[] bnkPattern = Convert.FromHexString("43534E44424B4454");
+                byte[] bnkNamePattern = Convert.FromHexString("43534E44424E4B5F");
+                byte[] data = File.ReadAllBytes(file);
+
+                Directory.CreateDirectory("banks");
+
+                int count = 0;
+
+                long[] nameOffsets = SearchPattern(data, bnkNamePattern);
+                long[] offsets = SearchPattern(data, bnkPattern);
+
+                foreach (long nOffset in nameOffsets)
                 {
-                    ms.Seek(nOffset + 8, SeekOrigin.Begin);
-                    reader.ReadInt32();
-                    reader.ReadInt32();
-                    int length = reader.ReadInt32();
-                    reader.ReadBytes(length);
-                    int strlen = reader.ReadInt32();
-                    string name = Encoding.UTF8.GetString(reader.ReadBytes(strlen));
-
-                    names.Add(name);
-                }
-            }
-
-            foreach (long offset in offsets)
-            {
-                List<byte> bank = new List<byte>();
-
-                using (MemoryStream ms = new MemoryStream(data))
-                using (BinaryReader reader = new BinaryReader(ms))
-                {
-                    ms.Seek(offset, SeekOrigin.Begin);
-
-                    while (ms.Position < ms.Length)
+                    try
                     {
-                        byte currentByte = reader.ReadByte();
-                        if (currentByte == 0x2D)
+                        using (MemoryStream ms = new MemoryStream(data))
+                        using (BinaryReader reader = new BinaryReader(ms))
                         {
-                            byte[] nextBytes = reader.ReadBytes(6);
-                            if (nextBytes.Length == 6 && nextBytes.All(b => b == 0x2D))
+                            ms.Seek(nOffset + 8, SeekOrigin.Begin);
+
+                            // Ensure enough bytes are available for reading
+                            if (ms.Length - ms.Position < sizeof(int) * 3)
                             {
+                                // Handle the case where there's not enough data
                                 break;
                             }
-                            else
+
+                            reader.ReadInt32();
+                            reader.ReadInt32();
+                            int length = reader.ReadInt32();
+
+                            // Check if the length is valid and within bounds
+                            if (ms.Length - ms.Position < length + sizeof(int))
                             {
-                                bank.Add(currentByte);
-                                bank.AddRange(nextBytes);
+                                // Handle invalid length (e.g., corrupted data)
+                                break;
                             }
+
+                            reader.ReadBytes(length);
+                            int strlen = reader.ReadInt32();
+
+                            if (ms.Length - ms.Position < strlen)
+                            {
+                                // Handle invalid string length
+                                break;
+                            }
+
+                            string name = Encoding.UTF8.GetString(reader.ReadBytes(strlen));
+
+                            names.Add(name);
                         }
-                        else
-                        {
-                            bank.Add(currentByte);
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing name at offset {nOffset} in file {file}: {ex.Message}");
                     }
                 }
 
-                string filename = names.ElementAtOrDefault(count) ?? $"UNK_BANK_{count}";
+                foreach (long offset in offsets)
+                {
+                    try
+                    {
+                        List<byte> bank = new List<byte>();
 
-                string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
-                File.WriteAllBytes(outputFilePath, FixBank(bank.ToArray()));
-                count++;
+                        using (MemoryStream ms = new MemoryStream(data))
+                        using (BinaryReader reader = new BinaryReader(ms))
+                        {
+                            ms.Seek(offset, SeekOrigin.Begin);
+
+                            while (ms.Position < ms.Length)
+                            {
+                                byte currentByte = reader.ReadByte();
+                                if (currentByte == 0x2D)
+                                {
+                                    byte[] nextBytes = reader.ReadBytes(6);
+                                    if (nextBytes.Length == 6 && nextBytes.All(b => b == 0x2D))
+                                    {
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        bank.Add(currentByte);
+                                        bank.AddRange(nextBytes);
+                                    }
+                                }
+                                else
+                                {
+                                    bank.Add(currentByte);
+                                }
+                            }
+                        }
+
+                        string filename = names.ElementAtOrDefault(count) ?? $"UNK_BANK_{count}";
+
+                        string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
+                        File.WriteAllBytes(outputFilePath, FixBank(bank.ToArray()));
+                        count++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing bank at offset {offset} in file {file}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to parse file {file}: {ex.Message}");
             }
         }
 
