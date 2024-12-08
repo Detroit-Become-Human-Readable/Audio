@@ -6,6 +6,29 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <BaseOutputPath>..\build_out</BaseOutputPath>
+    <ApplicationIcon>5a857fedc6d94df76e071bd08e37cb9d.ico</ApplicationIcon>
+    <AssemblyName>DetroitAudioExtractor</AssemblyName>
+    <Description>Tool to extract audio files from the game "Detroit: Become Human"</Description>
+    <PackageIcon>detroitread.png</PackageIcon>
+    <Title>Detroit Audio Extractor</Title>
+    <Authors>root-mega, BalancedLight</Authors>
+    <Product>$(Title)</Product>
+    <Company>Detroit: Become Human Readable</Company>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="5a857fedc6d94df76e071bd08e37cb9d.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="F:\Windold\Downloads\detroitread.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="taglib-sharp-netstandard2.0" Version="2.1.0" />
+  </ItemGroup>
 
 </Project>

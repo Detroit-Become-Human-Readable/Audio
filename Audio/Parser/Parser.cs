@@ -1,121 +1,76 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Audio.Parser
 {
     public class Parser
     {
+        // Patterns
+        private static readonly byte[] bnkPattern = { 0x43, 0x53, 0x4E, 0x44, 0x42, 0x4B, 0x44, 0x54 };    // "CSNDBKDT"
+        private static readonly byte[] bnkNamePattern = { 0x43, 0x53, 0x4E, 0x44, 0x42, 0x4E, 0x4B, 0x5F }; // "CSNDBNK_"
+
         public void Parse(string file)
         {
+            if (!File.Exists(file))
+            {
+                Console.WriteLine($"File does not exist: {file}");
+                return;
+            }
+
             List<string> names = new List<string>();
 
             try
             {
-                byte[] bnkPattern = Convert.FromHexString("43534E44424B4454");
-                byte[] bnkNamePattern = Convert.FromHexString("43534E44424E4B5F");
-                byte[] data = File.ReadAllBytes(file);
-
                 Directory.CreateDirectory("banks");
 
-                int count = 0;
-
-                long[] nameOffsets = SearchPattern(data, bnkNamePattern);
-                long[] offsets = SearchPattern(data, bnkPattern);
-
-                foreach (long nOffset in nameOffsets)
+                using (var mmf = MemoryMappedFile.CreateFromFile(file, FileMode.Open, null, 0, MemoryMappedFileAccess.Read))
                 {
-                    try
+                    using (var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read))
                     {
-                        using (MemoryStream ms = new MemoryStream(data))
-                        using (BinaryReader reader = new BinaryReader(ms))
+                        long length = accessor.Capacity;
+                        byte[] fileBytes = new byte[length];
+                        accessor.ReadArray(0, fileBytes, 0, fileBytes.Length);
+
+                        long[] nameOffsets = SearchPattern(fileBytes, bnkNamePattern);
+                        long[] bankOffsets = SearchPattern(fileBytes, bnkPattern);
+
+                        foreach (long nOffset in nameOffsets)
                         {
-                            ms.Seek(nOffset + 8, SeekOrigin.Begin);
-
-                            // Ensure enough bytes are available for reading
-                            if (ms.Length - ms.Position < sizeof(int) * 3)
+                            string name = TryReadName(fileBytes, nOffset);
+                            if (name != null)
                             {
-                                // Handle the case where there's not enough data
-                                break;
-                            }
-
-                            reader.ReadInt32();
-                            reader.ReadInt32();
-                            int length = reader.ReadInt32();
-
-                            // Check if the length is valid and within bounds
-                            if (ms.Length - ms.Position < length + sizeof(int))
-                            {
-                                // Handle invalid length (e.g., corrupted data)
-                                break;
-                            }
-
-                            reader.ReadBytes(length);
-                            int strlen = reader.ReadInt32();
-
-                            if (ms.Length - ms.Position < strlen)
-                            {
-                                // Handle invalid string length
-                                break;
-                            }
-
-                            string name = Encoding.UTF8.GetString(reader.ReadBytes(strlen));
-
-                            names.Add(name);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error processing name at offset {nOffset} in file {file}: {ex.Message}");
-                    }
-                }
-
-                foreach (long offset in offsets)
-                {
-                    try
-                    {
-                        List<byte> bank = new List<byte>();
-
-                        using (MemoryStream ms = new MemoryStream(data))
-                        using (BinaryReader reader = new BinaryReader(ms))
-                        {
-                            ms.Seek(offset, SeekOrigin.Begin);
-
-                            while (ms.Position < ms.Length)
-                            {
-                                byte currentByte = reader.ReadByte();
-                                if (currentByte == 0x2D)
-                                {
-                                    byte[] nextBytes = reader.ReadBytes(6);
-                                    if (nextBytes.Length == 6 && nextBytes.All(b => b == 0x2D))
-                                    {
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        bank.Add(currentByte);
-                                        bank.AddRange(nextBytes);
-                                    }
-                                }
-                                else
-                                {
-                                    bank.Add(currentByte);
-                                }
+                                names.Add(name);
                             }
                         }
 
-                        string filename = names.ElementAtOrDefault(count) ?? $"UNK_BANK_{count}";
+                        int count = 0;
+                        foreach (long offset in bankOffsets)
+                        {
+                            try
+                            {
+                                byte[] bankData = ExtractBankData(fileBytes, offset);
+                                if (bankData != null && bankData.Length > 0)
+                                {
+                                    string filename = (count < names.Count) ? names[count] : $"UNK_BANK_{count}";
+                                    string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
+                                    File.WriteAllBytes(outputFilePath, FixBank(bankData));
+                                    count++;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error processing bank at offset {offset} in file {file}: {ex.Message}");
+                            }
+                        }
 
-                        string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
-                        File.WriteAllBytes(outputFilePath, FixBank(bank.ToArray()));
-                        count++;
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error processing bank at offset {offset} in file {file}: {ex.Message}");
+                        // Release memory
+                        fileBytes = null;
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
                     }
                 }
             }
@@ -125,14 +80,88 @@ namespace Audio.Parser
             }
         }
 
-        byte[] FixBank(byte[] buffer)
+        private string TryReadName(byte[] data, long nOffset)
         {
-            byte[] targetSequence = { 0x42, 0x4B, 0x48, 0x44 };
+            // After "CSNDBNK_", the structure is:
+            // 2 unknown int32
+            // int32 length
+            // [length bytes of unknown data]
+            // int32 strlen
+            // [strlen bytes of actual name]
 
+            int pos = (int)nOffset + 8;
+            if (pos + (3 * sizeof(int)) > data.Length) return null;
+
+            // Skip 2 int32
+            pos += sizeof(int); // skip
+            pos += sizeof(int); // skip
+
+            int length = BitConverter.ToInt32(data, pos);
+            pos += sizeof(int);
+            if (pos + length + sizeof(int) > data.Length) return null;
+
+            pos += length;
+
+            int strlen = BitConverter.ToInt32(data, pos);
+            pos += sizeof(int);
+            if (pos + strlen > data.Length) return null;
+
+            return Encoding.UTF8.GetString(data, pos, strlen);
+        }
+
+        private byte[] ExtractBankData(byte[] data, long offset)
+        {
+            int start = (int)offset;
+            int end = data.Length;
+
+            // Looking for a terminator sequence of six '-' (0x2D) in a row.
+            for (int i = start; i < end; i++)
+            {
+                if (data[i] == 0x2D)
+                {
+                    bool isTerminator = true;
+                    for (int j = 1; j < 7; j++)
+                    {
+                        if (i + j >= end || data[i + j] != 0x2D)
+                        {
+                            isTerminator = false;
+                            break;
+                        }
+                    }
+
+                    if (isTerminator)
+                    {
+                        int length = i - start;
+                        if (length > 0)
+                        {
+                            byte[] bank = new byte[length];
+                            Buffer.BlockCopy(data, start, bank, 0, length);
+                            return bank;
+                        }
+                        return null;
+                    }
+                }
+            }
+
+            // If no terminator found, return everything from offset
+            if (end > start)
+            {
+                byte[] bank = new byte[end - start];
+                Buffer.BlockCopy(data, start, bank, 0, bank.Length);
+                return bank;
+            }
+
+            return null;
+        }
+
+        private byte[] FixBank(byte[] buffer)
+        {
+            // Remove everything until "BKHD"
+            byte[] targetSequence = { 0x42, 0x4B, 0x48, 0x44 }; // "BKHD"
             return RemoveUntilSequence(buffer, targetSequence);
         }
 
-        static byte[] RemoveUntilSequence(byte[] byteArray, byte[] targetSequence)
+        private static byte[] RemoveUntilSequence(byte[] byteArray, byte[] targetSequence)
         {
             for (int i = 0; i <= byteArray.Length - targetSequence.Length; i++)
             {
@@ -150,43 +179,62 @@ namespace Audio.Parser
                 {
                     int newLength = byteArray.Length - i;
                     byte[] newArray = new byte[newLength];
-                    Array.Copy(byteArray, i, newArray, 0, newLength);
+                    Buffer.BlockCopy(byteArray, i, newArray, 0, newLength);
                     return newArray;
                 }
             }
 
-            return new byte[0];
+            return Array.Empty<byte>();
         }
 
         public static long[] SearchPattern(byte[] data, byte[] pattern)
         {
-            if (data == null || data.Length == 0)
-                throw new ArgumentException("Data cannot be null or empty.", nameof(data));
+            if (pattern.Length == 0)
+                return Array.Empty<long>();
 
-            if (pattern == null || pattern.Length == 0)
-                throw new ArgumentException("Pattern cannot be null or empty.", nameof(pattern));
+            int[] lps = BuildKmpTable(pattern);
+            List<long> matches = new List<long>();
 
-            List<long> offsets = new List<long>();
-
-            for (long i = 0; i <= data.Length - pattern.Length; i++)
+            int j = 0; // pattern index
+            for (int i = 0; i < data.Length; i++)
             {
-                bool match = true;
-                for (int j = 0; j < pattern.Length; j++)
+                while (j > 0 && data[i] != pattern[j])
                 {
-                    if (data[i + j] != pattern[j])
-                    {
-                        match = false;
-                        break;
-                    }
+                    j = lps[j - 1];
                 }
 
-                if (match)
+                if (data[i] == pattern[j])
                 {
-                    offsets.Add(i);
+                    j++;
+                    if (j == pattern.Length)
+                    {
+                        matches.Add(i - j + 1);
+                        j = lps[j - 1];
+                    }
                 }
             }
 
-            return offsets.ToArray();
+            return matches.ToArray();
+        }
+
+        private static int[] BuildKmpTable(byte[] pattern)
+        {
+            int[] lps = new int[pattern.Length];
+            int length = 0;
+            for (int i = 1; i < pattern.Length; i++)
+            {
+                while (length > 0 && pattern[i] != pattern[length])
+                {
+                    length = lps[length - 1];
+                }
+
+                if (pattern[i] == pattern[length])
+                {
+                    length++;
+                    lps[i] = length;
+                }
+            }
+            return lps;
         }
     }
 }

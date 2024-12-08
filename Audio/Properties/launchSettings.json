@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Audio": {
+      "commandName": "Project",
+      "commandLineArgs": "--delete_errors\r\n--mark_music"
+    }
+  }
+}

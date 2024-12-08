@@ -1,13 +1,20 @@
-# Audio
+# Detroit: Become Human Audio Extractor
 [WIP] Extract playable audio files from Detroit: Become Human!
 
 ## Features
 1. Extract BNK
 2. Extract WEM
+3. Extract OGG
+4. Convert OGG to listenable OGG format.
+5. Mark possible music with a command line argument.
+
+## Command Line Arguments
+`--delete-errors`
+Automatically deletes faulty or corrupt .OGG files during conversion.
+
+`--mark-music`
+Automatically add a comment tag to any audio with stereo channels, most music in the game uses this.
    
 
 ## READ
 This tool is WIP! It doesn't work yet fully, any contribution is appreciated!!!
-Automatic OGG extraction is WIP. In the meanwhile, you can use these CLI tools:
-[ww2ogg](https://github.com/hcs64/ww2ogg/tree/master/src)
-[ReVorb](https://github.com/ItsBranK/ReVorb)
