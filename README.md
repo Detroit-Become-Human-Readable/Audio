@@ -13,7 +13,7 @@
 Automatically deletes faulty or corrupt .OGG files during conversion.
 
 `--mark-music`
-Automatically add a comment tag to any audio with stereo channels, most music in the game uses this.
+Automatically add a comment tag to any audio with stereo or quad channels and a sample rate of 48000 Hz. Additionally, tags files located in directories containing "music" in their path.
 
 `--{LANGUAGE}`
 Only exports the given dialogue languages, can be stacked. 
