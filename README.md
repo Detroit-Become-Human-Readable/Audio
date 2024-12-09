@@ -7,6 +7,7 @@
 3. Extract OGG
 4. Convert OGG to listenable OGG format.
 5. Mark possible music with a command line argument.
+6. Extract dialogue (experimental)
 
 ## Command Line Arguments
 `--delete-errors`
