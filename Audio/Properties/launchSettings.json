@@ -2,7 +2,7 @@
   "profiles": {
     "Audio": {
       "commandName": "Project",
-      "commandLineArgs": "--delete_errors\r\n--mark_music"
+      "commandLineArgs": "--delete_errors\r\n--mark_music\r\n--english"
     }
   }
 }

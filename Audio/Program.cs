@@ -4,10 +4,11 @@ using System.Linq;
 using System.Net.Http;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Audio.Parser;
 using TagLib;
-
-namespace Audio
+    
+namespace DetroitAudioExtractor
 {
     class Program
     {
@@ -28,17 +29,72 @@ namespace Audio
 
             if (deleteErrorFiles)
             {
-                Console.WriteLine("'delete_errors' argument active, faulty .ogg or .wem files will be deleted in the conversion process.");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: Delete error files enabled.");
+                Console.ResetColor();
             }
 
             if (markPossibleMusicFiles)
             {
-                Console.WriteLine("'mark_music' argument active, possible music files will be marked in the conversion process.");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: Mark possible music files enabled.");
+                Console.ResetColor();
             }
 
+            // New code to parse language arguments
+            List<string> selectedLanguages = new List<string>();
+
+            // Language options mapping command-line arguments to language codes
+            Dictionary<string, string> languageOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "--english", "ENG" },
+                { "--mexican", "MEX" },
+                { "--brazilian", "BRA" },
+                { "--french", "FRE" },
+                { "--arabic", "ARA" },
+                { "--russian", "RUS" },
+                { "--polish", "POL" },
+                { "--portuguese", "POR" },
+                { "--italian", "ITA" },
+                { "--german", "GER" },
+                { "--spanish", "SPA" },
+                { "--japanese", "JPN" }
+            };
+
+            foreach (var arg in args)
+            {
+                if (languageOptions.TryGetValue(arg.ToLowerInvariant(), out var langCode))
+                {
+                    if (!selectedLanguages.Contains(langCode))
+                    {
+                        selectedLanguages.Add(langCode);
+                    }
+                }
+            }
+
+            // If any languages are specified, include 'UNK' for unknown dialogues
+            if (selectedLanguages.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: Selected languages: " + string.Join(", ", selectedLanguages));
+                Console.ResetColor();
+
+                if (!selectedLanguages.Contains("UNK"))
+                {
+                    selectedLanguages.Add("UNK");
+                }
+            }
+            else
+            {
+                // If no languages specified, select all languages including 'UNK'
+                selectedLanguages.AddRange(languageOptions.Values);
+                if (!selectedLanguages.Contains("UNK"))
+                {
+                    selectedLanguages.Add("UNK");
+                }
+            }
             try
             {
-                // Ensure external tools are present
                 await CheckExternalToolsAsync().ConfigureAwait(false);
 
                 StartAction action = InitialStateCheck();
@@ -46,10 +102,10 @@ namespace Audio
                 switch (action)
                 {
                     case StartAction.NormalFlow:
-                        await RunNormalFlowAsync(deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
+                        await RunNormalFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
                         break;
                     case StartAction.ExtractWemOnly:
-                        await ExtractWemOnlyFlowAsync(deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
+                        await ExtractWemOnlyFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
                         break;
                     case StartAction.OggAndRevorbOnly:
                         ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles);
@@ -61,12 +117,16 @@ namespace Audio
 
                 if (action != StartAction.Exit)
                 {
+                    Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("Process completed successfully. Have a nice day.");
+                    Console.ResetColor();
                 }
             }
             catch (Exception ex)
             {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Software instability detected: {ex.Message}");
+                Console.ResetColor();
             }
             finally
             {
@@ -82,8 +142,8 @@ namespace Audio
             bool banksExist = Directory.Exists("banks") && IsDirectoryNotEmpty("banks");
             bool wemExist = Directory.Exists("wem") && IsDirectoryNotEmpty("wem");
 
-            Console.WriteLine($"Banks exist: {banksExist}");
-            Console.WriteLine($"WEM exist: {wemExist}");
+            //Console.WriteLine($"Banks exist: {banksExist}");
+            //Console.WriteLine($"WEM exist: {wemExist}");
 
             if (banksExist && !wemExist)
             {
@@ -106,47 +166,57 @@ namespace Audio
             return StartAction.NormalFlow;
         }
 
-        static async Task RunNormalFlowAsync(bool deleteErrorFiles, bool markPossibleMusicFiles)
+        // Update method signatures to accept selectedLanguages
+        static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles)
         {
-            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.1.1 By root-mega & BalancedLight");
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
+            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.0 By root-mega & BalancedLight");
+            Console.ResetColor();
             Console.WriteLine("Enter your game folder directory: ");
             string gamePath = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(gamePath))
             {
                 throw new InvalidOperationException("Game path cannot be null or empty.");
             }
-
             string[] fileNames = new string[]
             {
-                "BigFile_PC.dat", "BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
-                "BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11",
-                "BigFile_PC.d12", "BigFile_PC.d13", "BigFile_PC.d14", "BigFile_PC.d15", "BigFile_PC.d16",
-                "BigFile_PC.d17", "BigFile_PC.d18", "BigFile_PC.d19", "BigFile_PC.d20", "BigFile_PC.d21",
-                "BigFile_PC.d22", "BigFile_PC.d23", "BigFile_PC.d24"
+                "BigFile_PC.dat", "BigFile_PC.dep", "BigFile_PC.idx",
+                "BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
+                "BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d07", "BigFile_PC.d08",
+                "BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11", "BigFile_PC.d12",
+                "BigFile_PC.d13", "BigFile_PC.d14", "BigFile_PC.d15", "BigFile_PC.d16",
+                "BigFile_PC.d17", "BigFile_PC.d18", "BigFile_PC.d19", "BigFile_PC.d20",
+                "BigFile_PC.d21", "BigFile_PC.d22", "BigFile_PC.d23", "BigFile_PC.d24",
+                "BigFile_PC.d25", "BigFile_PC.d26", "BigFile_PC.d27", "BigFile_PC.d28",
+                "BigFile_PC.d29"
             };
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Loading, scanning through, and extracting all BigFiles.\nFeel free to step away or work on something else. This will take a while! A message will be printed when the process finishes.");
+            Console.ResetColor();
 
-            Console.WriteLine("Scanning through and loading all BigFiles, please wait...");
-            Parser.Parser parser = new Parser.Parser();
+            Parser.Parser parser = new Parser.Parser(selectedLanguages);
             foreach (var fileName in fileNames)
             {
                 string filePath = Path.Combine(gamePath, fileName);
                 if (!System.IO.File.Exists(filePath))
                 {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine($"System.IO.File not found: {filePath}. Skipping...");
+                    Console.ResetColor();
                     continue;
                 }
                 Console.WriteLine($"Loading {filePath}...");
-                parser.Parse(filePath);
+                await Task.Run(() => parser.Parse(filePath));
             }
 
-            ExtractWemFilesFromBanks();
-            ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles);
+            await Task.Run(() => ExtractWemFilesFromBanks());
+            await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));
         }
 
-        static async Task ExtractWemOnlyFlowAsync(bool deleteErrorFiles, bool markPossibleMusicFiles)
+        static async Task ExtractWemOnlyFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles)
         {
-            ExtractWemFilesFromBanks();
-            ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles);
+            await Task.Run(() => ExtractWemFilesFromBanks());
+            await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));
         }
 
         static void ExtractWemFilesFromBanks()
@@ -166,7 +236,9 @@ namespace Audio
             }
             else
             {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("No banks detected for WEM extraction!");
+                Console.ResetColor();
             }
         }
 
@@ -177,7 +249,9 @@ namespace Audio
                 string wemRoot = Path.Combine(".", "wem");
                 if (!Directory.Exists(wemRoot) || !IsDirectoryNotEmpty(wemRoot))
                 {
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("No WEM files found to convert to OGG.");
+                    Console.ResetColor();
                     return;
                 }
 
@@ -189,87 +263,72 @@ namespace Audio
                 string oggRoot = Path.Combine(".", "ogg");
                 Directory.CreateDirectory(oggRoot);
 
-                // Process each subdirectory in wem root
-                foreach (var subdirectory in Directory.GetDirectories(wemRoot))
+                foreach (var wemFile in Directory.GetFiles(wemRoot, "*.wem", SearchOption.AllDirectories))
                 {
-                    string[] wemFiles = Directory.GetFiles(subdirectory, "*.wem");
-                    if (wemFiles.Length == 0) continue;
+                    Console.WriteLine($"Processing file: {wemFile}");
+                    string relativePath = Path.GetRelativePath(wemRoot, wemFile);
+                    string oggOutputPath = Path.Combine(oggRoot, Path.ChangeExtension(relativePath, ".ogg"));
+                    string oggSubDir = Path.GetDirectoryName(oggOutputPath);
 
-                    string relativeSubDir = Path.GetFileName(subdirectory);
-                    string oggSubDir = Path.Combine(oggRoot, relativeSubDir);
                     Directory.CreateDirectory(oggSubDir);
 
-                    foreach (var wemFile in wemFiles)
+                    bool ww2oggSuccess = RunProcess(ww2oggPath, $"\"{wemFile}\" --pcb \"{codebooksPath}\" -o \"{oggOutputPath}\"");
+                    if (!ww2oggSuccess)
                     {
-                        string outputOggFile = Path.Combine(oggSubDir, Path.GetFileNameWithoutExtension(wemFile) + ".ogg");
-
-                        // Convert WEM -> OGG
-                        bool ww2oggSuccess = RunProcess(ww2oggPath, $"\"{wemFile}\" --pcb \"{codebooksPath}\" -o \"{outputOggFile}\"");
-                        if (!ww2oggSuccess)
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Failed to convert WEM to OGG for file: {wemFile}");
+                        Console.ResetColor();
+                        if (deleteErrorFiles && System.IO.File.Exists(oggOutputPath))
                         {
-                            Console.WriteLine($"Failed to convert WEM to OGG for file: {wemFile}");
-                            if (deleteErrorFiles && System.IO.File.Exists(outputOggFile))
-                            {
-                                System.IO.File.Delete(outputOggFile);
-                            }
-                            continue;
+                            System.IO.File.Delete(oggOutputPath);
                         }
+                        continue;
+                    }
 
-                        // Run ReVorb
-                        string tempOggFile = Path.Combine(oggSubDir, Path.GetFileNameWithoutExtension(wemFile) + "_fixed.ogg");
-                        bool revorbSuccess = RunProcess(revorbPath, $"\"{outputOggFile}\" \"{tempOggFile}\"");
+                    string tempOggFile = Path.Combine(oggSubDir, Path.GetFileNameWithoutExtension(wemFile) + "_fixed.ogg");
+                    bool revorbSuccess = RunProcess(revorbPath, $"\"{oggOutputPath}\" \"{tempOggFile}\"");
 
-                        if (revorbSuccess)
+                    if (revorbSuccess)
+                    {
+                        // Replace original with fixed
+                        try
                         {
-                            // Replace original with fixed
-                            try
-                            {
-                                System.IO.File.Delete(outputOggFile);
-                                System.IO.File.Move(tempOggFile, outputOggFile);
+                            System.IO.File.Delete(oggOutputPath);
+                            System.IO.File.Move(tempOggFile, oggOutputPath);
 
-                                // Mark possible music files if stereo
-                                if (markPossibleMusicFiles)
+                            // Mark possible music files if stereo or quad, and 48kHz, or if the directory name contains "music"
+                            if (markPossibleMusicFiles)
+                            {
+                                using var file = TagLib.File.Create(oggOutputPath);
+                                if (
+                                    ((file.Properties.AudioChannels == 2 || file.Properties.AudioChannels == 4) && 
+                                    file.Properties.AudioSampleRate == 48000) ||
+                                    (oggSubDir != null && 
+                                    oggSubDir.Contains("music", StringComparison.OrdinalIgnoreCase))
+                                )
                                 {
-                                    using (var file = TagLib.File.Create(outputOggFile))
-                                    {
-                                        if (file.Properties.AudioChannels == 2)
-                                        {
-                                            file.Tag.Comment = "Possible music file";
-                                            file.Save();
-                                        }
-                                    }
+                                    file.Tag.Comment = "Possible music file";
+                                    file.Save();
                                 }
-
-                                Console.WriteLine($"Successfully converted and fixed OGG file: {outputOggFile}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"Failed to replace original OGG file with fixed version: {ex.Message}");
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Console.WriteLine($"ReVorb failed for file: {outputOggFile}");
-                            if (deleteErrorFiles && System.IO.File.Exists(outputOggFile))
-                            {
-                                try
-                                {
-                                    System.IO.File.Delete(outputOggFile);
-                                    Console.WriteLine($"Deleted faulty OGG file: {outputOggFile}");
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"Failed to delete OGG file: {outputOggFile} - {ex.Message}");
-                                }
-                            }
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"An error occurred during OGG/ReVorb steps: {ex.Message}");
+                            Console.ResetColor();
                         }
                     }
                 }
+                Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("WEM files extracted and converted. Check the 'ogg' directory.");
+                Console.ResetColor();
             }
             catch (Exception ex)
             {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"An error occurred during OGG/ReVorb steps: {ex.Message}");
+                Console.ResetColor();
             }
         }
 
@@ -284,13 +343,21 @@ namespace Audio
                     Console.WriteLine(upperKey); // Echo choice
                     return upperKey;
                 }
+                Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("Invalid choice. Please try again.");
+                Console.ResetColor();
             }
         }
 
         static bool IsDirectoryNotEmpty(string path)
         {
-            return Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any();
+            if (!Directory.Exists(path))
+            {
+                return false;
+            }
+
+            // Check for files and directories
+            return Directory.EnumerateFileSystemEntries(path).Any();
         }
 
         static bool RunProcess(string fileName, string arguments)
@@ -329,7 +396,9 @@ namespace Audio
                 }
                 catch (Exception ex)
                 {
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"Failed to run process {fileName}: {ex.Message}");
+                    Console.ResetColor();
                     return false;
                 }
             }
@@ -345,13 +414,17 @@ namespace Audio
 
             if (!System.IO.File.Exists(ww2oggPath))
             {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine("ww2ogg.exe not found. Downloading...");
+                Console.ResetColor();
                 await DownloadAndExtractWw2oggAsync(externPath).ConfigureAwait(false);
             }
 
             if (!System.IO.File.Exists(revorbPath))
             {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine("ReVorb.exe not found. Downloading...");
+                Console.ResetColor();
                 await DownloadFileAsync("https://github.com/ItsBranK/ReVorb/releases/download/v1.0/ReVorb.exe", revorbPath).ConfigureAwait(false);
             }
         }
@@ -362,10 +435,13 @@ namespace Audio
             string zipPath = Path.Combine(destinationPath, "ww2ogg024.zip");
 
             await DownloadFileAsync(url, zipPath).ConfigureAwait(false);
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine("Extracting ww2ogg...");
             System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, destinationPath);
             System.IO.File.Delete(zipPath);
+            Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("ww2ogg extracted successfully.");
+            Console.ResetColor();
         }
 
         static async Task DownloadFileAsync(string url, string destinationPath)
@@ -382,11 +458,15 @@ namespace Audio
                             await response.Content.CopyToAsync(fs).ConfigureAwait(false);
                         }
                     }
+                    Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"Downloaded {Path.GetFileName(destinationPath)} successfully.");
+                    Console.ResetColor();
                 }
                 catch (Exception ex)
                 {
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"Failed to download {url}: {ex.Message}");
+                    Console.ResetColor();
                 }
             }
         }

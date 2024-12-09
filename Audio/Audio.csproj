@@ -6,22 +6,30 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <BaseOutputPath>..\build_out</BaseOutputPath>
-    <ApplicationIcon>5a857fedc6d94df76e071bd08e37cb9d.ico</ApplicationIcon>
+    <ApplicationIcon>DAEIcon.ico</ApplicationIcon>
     <AssemblyName>DetroitAudioExtractor</AssemblyName>
+    <AssemblyTitle>Detroit Audio Extractor</AssemblyTitle>
     <Description>Tool to extract audio files from the game "Detroit: Become Human"</Description>
     <PackageIcon>detroitread.png</PackageIcon>
     <Title>Detroit Audio Extractor</Title>
     <Authors>root-mega, BalancedLight</Authors>
-    <Product>$(Title)</Product>
+    <Product>Detroit Audio Extractor</Product>
     <Company>Detroit: Become Human Readable</Company>
+    <Version>0.3.0</Version>
+    <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
+    <FileVersion>$(PackageVersion)</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="5a857fedc6d94df76e071bd08e37cb9d.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="F:\Windold\Downloads\detroitread.png">
+    <None Include="detroitread.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
