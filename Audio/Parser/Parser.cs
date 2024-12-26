@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
@@ -168,6 +169,9 @@ namespace DetroitAudioExtractor.Parser
             if (string.IsNullOrEmpty(languageCode))
             {
                 languageCode = "UNK"; // default if not found
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"Failed to extract language code from dialogue at offset {offset}. Using 'UNK'.");
+                Console.ResetColor();
             }
 
             if (!selectedLanguages.Contains(languageCode))
@@ -191,6 +195,10 @@ namespace DetroitAudioExtractor.Parser
             // The last segment is filename
             string fileName = segments[segments.Count - 1];
             segments.RemoveAt(segments.Count - 1);
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine($"Extracting dialogue WEM: {string.Join(" -> ", segments)} -> {fileName}");
+            Console.ResetColor();
+
 
             ExtractWemData(data, riffIndex, segments, fileName, languageFolder);
         }
@@ -246,21 +254,26 @@ namespace DetroitAudioExtractor.Parser
         private static string ExtractLanguageCodeFromEnd(ref string candidateStr)
         {
             int lastUnderscore = candidateStr.LastIndexOf('_');
-            if (lastUnderscore == -1) return null;
-
-            // Check if we have at least 3 chars after underscore
-            if (candidateStr.Length < lastUnderscore + 4) return null;
-
-            // Take exactly 3 chars after underscore as language code
-            string code = candidateStr.Substring(lastUnderscore + 1, 3).ToUpperInvariant();
-            if (!code.All(char.IsLetter))
+            while (lastUnderscore != -1)
             {
-                return null;
+                // Check if we have at least 3 chars after underscore
+                if (candidateStr.Length >= lastUnderscore + 3)
+                {
+                    // Take exactly 3 chars after underscore as language code
+                    string code = candidateStr.Substring(lastUnderscore + 1, 3).ToUpperInvariant();
+                    // Strip any numbers from the code
+                    code = new string(code.Where(char.IsLetter).ToArray());
+                    if (code.Length == 3)
+                    {
+                        // Remove the underscore and everything after it
+                        candidateStr = candidateStr.Substring(0, lastUnderscore);
+                        return code;
+                    }
+                }
+                // Move to the previous underscore
+                lastUnderscore = candidateStr.LastIndexOf('_', lastUnderscore - 1);
             }
-
-            // Remove the underscore and everything after it
-            candidateStr = candidateStr.Substring(0, lastUnderscore);
-            return code;
+            return null;
         }
 
 
@@ -425,6 +438,12 @@ namespace DetroitAudioExtractor.Parser
 
         private static int FindPattern(byte[] data, byte[] pattern, int startIndex = 0)
         {
+            // Ensure startIndex is within the valid range
+            if (startIndex < 0 || startIndex > data.Length - pattern.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startIndex), "startIndex must be non-negative and less than the size of the collection.");
+            }
+
             for (int i = startIndex; i <= data.Length - pattern.Length; i++)
             {
                 bool match = true;
