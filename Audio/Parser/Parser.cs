@@ -76,6 +76,7 @@ namespace DetroitAudioExtractor.Parser
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Failed to parse file {file}: {ex.Message}");
+                Console.WriteLine($"Stack trace:\n" + ex.StackTrace);
                 Console.ResetColor();
             }
         }
@@ -239,7 +240,6 @@ namespace DetroitAudioExtractor.Parser
             foreach (var b in bytes)
             {
                 char c = (char)b;
-                // Keep A-Z, a-z, 0-9, underscore
                 if ((c >= 'A' && c <= 'Z') ||
                     (c >= 'a' && c <= 'z') ||
                     (c >= '0' && c <= '9') ||
@@ -256,48 +256,58 @@ namespace DetroitAudioExtractor.Parser
             int lastUnderscore = candidateStr.LastIndexOf('_');
             while (lastUnderscore != -1)
             {
-                // Check if we have at least 3 chars after underscore
                 if (candidateStr.Length >= lastUnderscore + 3)
                 {
-                    // Take exactly 3 chars after underscore as language code
                     string code = candidateStr.Substring(lastUnderscore + 1, 3).ToUpperInvariant();
-                    // Strip any numbers from the code
                     code = new string(code.Where(char.IsLetter).ToArray());
                     if (code.Length == 3)
                     {
-                        // Remove the underscore and everything after it
                         candidateStr = candidateStr.Substring(0, lastUnderscore);
                         return code;
                     }
                 }
-                // Move to the previous underscore
                 lastUnderscore = candidateStr.LastIndexOf('_', lastUnderscore - 1);
             }
             return null;
         }
 
-
         private string TryReadName(byte[] data, long nOffset)
         {
-            int pos = (int)nOffset + 8;
-            if (pos + (3 * sizeof(int)) > data.Length)
+            Console.WriteLine(nOffset);
+            int pos = (int)nOffset;
+
+            while (pos < data.Length)
             {
-                return null;
+                byte currentByte = data[pos];
+                pos++;
+
+                int length = 0;
+                if (pos + 3 < data.Length)
+                {
+                    length = BitConverter.ToInt32(data, pos);
+                    pos += 4;
+                }
+
+                if (length > 1000)
+                {
+                    continue;
+                }
+
+                if (pos + length + sizeof(int) > data.Length)
+                {
+                    return null;
+                }
+
+                string result = Encoding.UTF8.GetString(data, pos, length);
+
+                if (!string.IsNullOrEmpty(result))
+                {
+                    return result; 
+                }
+
+                pos += length;
             }
-
-            pos += sizeof(int);
-            pos += sizeof(int);
-
-            int length = BitConverter.ToInt32(data, pos);
-            pos += sizeof(int);
-            if (pos + length + sizeof(int) > data.Length) return null;
-
-            pos += length;
-            int strlen = BitConverter.ToInt32(data, pos);
-            pos += sizeof(int);
-            if (pos + strlen > data.Length) return null;
-
-            return Encoding.UTF8.GetString(data, pos, strlen);
+            return null;
         }
 
         private byte[] ExtractBankData(byte[] data, long offset)

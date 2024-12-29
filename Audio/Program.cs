@@ -180,11 +180,11 @@ namespace DetroitAudioExtractor
             }
             string[] fileNames = new string[]
             {
-                "BigFile_PC.dat", "BigFile_PC.dep", "BigFile_PC.idx",
-                "BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
-                "BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d07", "BigFile_PC.d08",
-                "BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11", "BigFile_PC.d12",
-                "BigFile_PC.d13", "BigFile_PC.d14", "BigFile_PC.d15", "BigFile_PC.d16",
+/*                "BigFile_PC.dat",*/ "BigFile_PC.dep", "BigFile_PC.idx",
+                //"BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
+                //"BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d07", "BigFile_PC.d08",
+                //"BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11", "BigFile_PC.d12",
+                /*"BigFile_PC.d13", "BigFile_PC.d14",*/ "BigFile_PC.d15", "BigFile_PC.d16",
                 "BigFile_PC.d17", "BigFile_PC.d18", "BigFile_PC.d19", "BigFile_PC.d20",
                 "BigFile_PC.d21", "BigFile_PC.d22", "BigFile_PC.d23", "BigFile_PC.d24",
                 "BigFile_PC.d25", "BigFile_PC.d26", "BigFile_PC.d27", "BigFile_PC.d28",
