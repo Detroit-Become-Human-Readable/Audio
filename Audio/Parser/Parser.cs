@@ -273,7 +273,6 @@ namespace DetroitAudioExtractor.Parser
 
         private string TryReadName(byte[] data, long nOffset)
         {
-            Console.WriteLine(nOffset);
             int pos = (int)nOffset;
 
             while (pos < data.Length)
@@ -288,7 +287,7 @@ namespace DetroitAudioExtractor.Parser
                     pos += 4;
                 }
 
-                if (length > 1000)
+                if (length > 1000 || length <= 0)
                 {
                     continue;
                 }
@@ -298,17 +297,37 @@ namespace DetroitAudioExtractor.Parser
                     return null;
                 }
 
-                string result = Encoding.UTF8.GetString(data, pos, length);
+                string candidate = Encoding.UTF8.GetString(data, pos, length);
 
-                if (!string.IsNullOrEmpty(result))
+                if (!string.IsNullOrEmpty(candidate))
                 {
-                    return result; 
+                    int lookaheadPos = pos + length;
+                    for (int offset = 0; offset < 0x20 && lookaheadPos + 4 < data.Length; offset++)
+                    {
+                        int nextLength = BitConverter.ToInt32(data, lookaheadPos);
+                        lookaheadPos += 4;
+
+                        if (nextLength > 0 && nextLength <= 1000 && lookaheadPos + nextLength <= data.Length)
+                        {
+                            string nextCandidate = Encoding.UTF8.GetString(data, lookaheadPos, nextLength);
+                            if (!string.IsNullOrEmpty(nextCandidate))
+                            {
+                                return nextCandidate;
+                            }
+                        }
+
+                        lookaheadPos -= 3;
+                    }
+
+                    return candidate;
                 }
 
                 pos += length;
             }
+
             return null;
         }
+
 
         private byte[] ExtractBankData(byte[] data, long offset)
         {
