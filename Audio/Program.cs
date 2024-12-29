@@ -151,14 +151,14 @@ namespace DetroitAudioExtractor
                 Console.WriteLine("Bank files detected, but no WEM files found.");
                 Console.WriteLine("Would you like to (E) Extract WEM files from them or (R) Restart?");
                 char choice = PromptChoice(new[] { 'E', 'R' });
-                return choice == 'R' ? StartAction.Exit : StartAction.ExtractWemOnly;
+                return choice == 'R' ? StartAction.NormalFlow : StartAction.ExtractWemOnly;
             }
             else if (banksExist && wemExist)
             {
                 // Banks and WEM files exist
                 Console.WriteLine("WEM files already present. (O) Convert WEM to OGG & run ReVorb, or (R) Restart?");
                 char choice = PromptChoice(new[] { 'O', 'R' });
-                return choice == 'R' ? StartAction.Exit : StartAction.OggAndRevorbOnly;
+                return choice == 'R' ? StartAction.NormalFlow : StartAction.OggAndRevorbOnly;
             }
 
             // Default
@@ -166,11 +166,10 @@ namespace DetroitAudioExtractor
             return StartAction.NormalFlow;
         }
 
-        // Update method signatures to accept selectedLanguages
         static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.0 By root-mega & BalancedLight");
+            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.1 By root-mega & BalancedLight");
             Console.ResetColor();
             Console.WriteLine("Enter your game folder directory: ");
             string gamePath = Console.ReadLine();

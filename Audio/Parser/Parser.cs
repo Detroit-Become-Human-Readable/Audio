@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
@@ -75,6 +76,7 @@ namespace DetroitAudioExtractor.Parser
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Failed to parse file {file}: {ex.Message}");
+                Console.WriteLine($"Stack trace:\n" + ex.StackTrace);
                 Console.ResetColor();
             }
         }
@@ -168,6 +170,9 @@ namespace DetroitAudioExtractor.Parser
             if (string.IsNullOrEmpty(languageCode))
             {
                 languageCode = "UNK"; // default if not found
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"Failed to extract language code from dialogue at offset {offset}. Using 'UNK'.");
+                Console.ResetColor();
             }
 
             if (!selectedLanguages.Contains(languageCode))
@@ -191,6 +196,10 @@ namespace DetroitAudioExtractor.Parser
             // The last segment is filename
             string fileName = segments[segments.Count - 1];
             segments.RemoveAt(segments.Count - 1);
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine($"Extracting dialogue WEM: {string.Join(" -> ", segments)} -> {fileName}");
+            Console.ResetColor();
+
 
             ExtractWemData(data, riffIndex, segments, fileName, languageFolder);
         }
@@ -231,7 +240,6 @@ namespace DetroitAudioExtractor.Parser
             foreach (var b in bytes)
             {
                 char c = (char)b;
-                // Keep A-Z, a-z, 0-9, underscore
                 if ((c >= 'A' && c <= 'Z') ||
                     (c >= 'a' && c <= 'z') ||
                     (c >= '0' && c <= '9') ||
@@ -246,46 +254,80 @@ namespace DetroitAudioExtractor.Parser
         private static string ExtractLanguageCodeFromEnd(ref string candidateStr)
         {
             int lastUnderscore = candidateStr.LastIndexOf('_');
-            if (lastUnderscore == -1) return null;
-
-            // Check if we have at least 3 chars after underscore
-            if (candidateStr.Length < lastUnderscore + 4) return null;
-
-            // Take exactly 3 chars after underscore as language code
-            string code = candidateStr.Substring(lastUnderscore + 1, 3).ToUpperInvariant();
-            if (!code.All(char.IsLetter))
+            while (lastUnderscore != -1)
             {
-                return null;
+                if (candidateStr.Length >= lastUnderscore + 3)
+                {
+                    string code = candidateStr.Substring(lastUnderscore + 1, 3).ToUpperInvariant();
+                    code = new string(code.Where(char.IsLetter).ToArray());
+                    if (code.Length == 3)
+                    {
+                        candidateStr = candidateStr.Substring(0, lastUnderscore);
+                        return code;
+                    }
+                }
+                lastUnderscore = candidateStr.LastIndexOf('_', lastUnderscore - 1);
             }
-
-            // Remove the underscore and everything after it
-            candidateStr = candidateStr.Substring(0, lastUnderscore);
-            return code;
+            return null;
         }
-
 
         private string TryReadName(byte[] data, long nOffset)
         {
-            int pos = (int)nOffset + 8;
-            if (pos + (3 * sizeof(int)) > data.Length)
+            int pos = (int)nOffset;
+
+            while (pos < data.Length)
             {
-                return null;
+                byte currentByte = data[pos];
+                pos++;
+
+                int length = 0;
+                if (pos + 3 < data.Length)
+                {
+                    length = BitConverter.ToInt32(data, pos);
+                    pos += 4;
+                }
+
+                if (length > 1000 || length <= 0)
+                {
+                    continue;
+                }
+
+                if (pos + length + sizeof(int) > data.Length)
+                {
+                    return null;
+                }
+
+                string candidate = Encoding.UTF8.GetString(data, pos, length);
+
+                if (!string.IsNullOrEmpty(candidate))
+                {
+                    int lookaheadPos = pos + length;
+                    for (int offset = 0; offset < 0x20 && lookaheadPos + 4 < data.Length; offset++)
+                    {
+                        int nextLength = BitConverter.ToInt32(data, lookaheadPos);
+                        lookaheadPos += 4;
+
+                        if (nextLength > 0 && nextLength <= 1000 && lookaheadPos + nextLength <= data.Length)
+                        {
+                            string nextCandidate = Encoding.UTF8.GetString(data, lookaheadPos, nextLength);
+                            if (!string.IsNullOrEmpty(nextCandidate))
+                            {
+                                return nextCandidate;
+                            }
+                        }
+
+                        lookaheadPos -= 3;
+                    }
+
+                    return candidate;
+                }
+
+                pos += length;
             }
 
-            pos += sizeof(int);
-            pos += sizeof(int);
-
-            int length = BitConverter.ToInt32(data, pos);
-            pos += sizeof(int);
-            if (pos + length + sizeof(int) > data.Length) return null;
-
-            pos += length;
-            int strlen = BitConverter.ToInt32(data, pos);
-            pos += sizeof(int);
-            if (pos + strlen > data.Length) return null;
-
-            return Encoding.UTF8.GetString(data, pos, strlen);
+            return null;
         }
+
 
         private byte[] ExtractBankData(byte[] data, long offset)
         {
@@ -425,6 +467,12 @@ namespace DetroitAudioExtractor.Parser
 
         private static int FindPattern(byte[] data, byte[] pattern, int startIndex = 0)
         {
+            // Ensure startIndex is within the valid range
+            if (startIndex < 0 || startIndex > data.Length - pattern.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startIndex), "startIndex must be non-negative and less than the size of the collection.");
+            }
+
             for (int i = startIndex; i <= data.Length - pattern.Length; i++)
             {
                 bool match = true;
