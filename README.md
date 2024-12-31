@@ -35,7 +35,6 @@ List of languages:
 --japanese : Japanese
 ```
 ## To-Do
-- Fix errors with some BigFiles
 - Get file names for non-dialogue audio.
 - Improve dialogue extractor
 - Improve extraction speed
