@@ -7,6 +7,7 @@
 3. Extract OGG
 4. Convert OGG to listenable OGG format.
 5. Mark possible music with a command line argument.
+6. Extract dialogue (experimental)
 
 ## Command Line Arguments
 `--logfile`
@@ -19,7 +20,7 @@ Extracts only the given files when inputting a directory. Specify multiple files
 Automatically deletes faulty or corrupt .OGG files during conversion.
 
 `--mark-music`
-Automatically add a comment tag to any audio with stereo channels, most music in the game uses this.
+Automatically add a comment tag to any audio with stereo or quad channels and a sample rate of 48000 Hz. Additionally, tags files located in directories containing "music" in their path.
 
 `--{LANGUAGE}`
 Only exports the given dialogue languages, can be stacked. **If no languages are passed, dialogue will be skipped.**
@@ -40,7 +41,6 @@ List of languages:
 --japanese : Japanese
 --all_lang : Extracts ALL dialogue files for every language (equivalent to specifying all individual language arguments)
 ```
-
 
 `--meltingpot`
 Instead of creating subfolders for dialogue, put them all into one folder. Might be chaotic.
