@@ -26,6 +26,20 @@ namespace DetroitAudioExtractor
 
             bool deleteErrorFiles = args.Contains("--delete-errors", StringComparer.OrdinalIgnoreCase) || args.Contains("--delete_errors", StringComparer.OrdinalIgnoreCase);
             bool markPossibleMusicFiles = args.Contains("--mark-music", StringComparer.OrdinalIgnoreCase) || args.Contains("--mark_music", StringComparer.OrdinalIgnoreCase);
+            bool enableLogging = args.Contains("--logfile", StringComparer.OrdinalIgnoreCase);
+            bool meltingPot = args.Contains("--meltingpot", StringComparer.OrdinalIgnoreCase);
+            
+            List<string> onlyExtractFiles = new List<string>();
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i].Equals("--onlyextract", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    string filesArg = args[i + 1];
+                    onlyExtractFiles.AddRange(filesArg.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(f => f.Trim()));
+                    break;
+                }
+            }
 
             if (deleteErrorFiles)
             {
@@ -41,8 +55,30 @@ namespace DetroitAudioExtractor
                 Console.ResetColor();
             }
 
+            if (enableLogging)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: Logging enabled.");
+                Console.ResetColor();
+            }
+
+            if (meltingPot)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: Melting pot mode enabled - dialogue files will be flattened.");
+                Console.ResetColor();
+            }
+
+            if (onlyExtractFiles.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Arg: Only extract mode enabled - processing {onlyExtractFiles.Count} specific files: {string.Join(", ", onlyExtractFiles)}");
+                Console.ResetColor();
+            }
+
             // New code to parse language arguments
             List<string> selectedLanguages = new List<string>();
+            bool allLanguages = args.Contains("--all_lang", StringComparer.OrdinalIgnoreCase);
 
             // Language options mapping command-line arguments to language codes
             Dictionary<string, string> languageOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -61,36 +97,51 @@ namespace DetroitAudioExtractor
                 { "--japanese", "JPN" }
             };
 
-            foreach (var arg in args)
+            if (allLanguages)
             {
-                if (languageOptions.TryGetValue(arg.ToLowerInvariant(), out var langCode))
-                {
-                    if (!selectedLanguages.Contains(langCode))
-                    {
-                        selectedLanguages.Add(langCode);
-                    }
-                }
-            }
-
-            // If any languages are specified, include 'UNK' for unknown dialogues
-            if (selectedLanguages.Count > 0)
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Arg: Selected languages: " + string.Join(", ", selectedLanguages));
-                Console.ResetColor();
-
-                if (!selectedLanguages.Contains("UNK"))
-                {
-                    selectedLanguages.Add("UNK");
-                }
-            }
-            else
-            {
-                // If no languages specified, select all languages including 'UNK'
+                // Extract all languages
                 selectedLanguages.AddRange(languageOptions.Values);
                 if (!selectedLanguages.Contains("UNK"))
                 {
                     selectedLanguages.Add("UNK");
+                }
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Arg: All languages selected for dialogue extraction.");
+                Console.ResetColor();
+            }
+            else
+            {
+                // Check for specific language arguments
+                foreach (var arg in args)
+                {
+                    if (languageOptions.TryGetValue(arg.ToLowerInvariant(), out var langCode))
+                    {
+                        if (!selectedLanguages.Contains(langCode))
+                        {
+                            selectedLanguages.Add(langCode);
+                        }
+                    }
+                }
+
+                // If any languages are specified, include 'UNK' for unknown dialogues
+                if (selectedLanguages.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Arg: Selected languages: " + string.Join(", ", selectedLanguages));
+                    Console.ResetColor();
+
+                    if (!selectedLanguages.Contains("UNK"))
+                    {
+                        selectedLanguages.Add("UNK");
+                    }
+                }
+                else
+                {
+                    // If no languages specified, do not extract dialogue
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Warning: No language arguments specified. Dialogue extraction will be skipped.");
+                    Console.WriteLine("Use --all_lang to extract all languages or specify individual languages (e.g., --english, --french).");
+                    Console.ResetColor();
                 }
             }
             try
@@ -102,10 +153,10 @@ namespace DetroitAudioExtractor
                 switch (action)
                 {
                     case StartAction.NormalFlow:
-                        await RunNormalFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
+                        await RunNormalFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles, enableLogging, meltingPot, onlyExtractFiles).ConfigureAwait(false);
                         break;
                     case StartAction.ExtractWemOnly:
-                        await ExtractWemOnlyFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles).ConfigureAwait(false);
+                        await ExtractWemOnlyFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles, enableLogging, meltingPot).ConfigureAwait(false);
                         break;
                     case StartAction.OggAndRevorbOnly:
                         ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles);
@@ -166,7 +217,7 @@ namespace DetroitAudioExtractor
             return StartAction.NormalFlow;
         }
 
-        static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles)
+        static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot, List<string> onlyExtractFiles)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.1 By root-mega & BalancedLight");
@@ -177,23 +228,41 @@ namespace DetroitAudioExtractor
             {
                 throw new InvalidOperationException("Game path cannot be null or empty.");
             }
-            string[] fileNames = new string[]
+            string[] fileNames;
+            if (onlyExtractFiles.Count > 0)
             {
-                "BigFile_PC.dat", "BigFile_PC.dep", "BigFile_PC.idx",
-                "BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
-                "BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d07", "BigFile_PC.d08",
-                "BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11", "BigFile_PC.d12",
-                "BigFile_PC.d13", "BigFile_PC.d14", "BigFile_PC.d15", "BigFile_PC.d16",
-                "BigFile_PC.d17", "BigFile_PC.d18", "BigFile_PC.d19", "BigFile_PC.d20",
-                "BigFile_PC.d21", "BigFile_PC.d22", "BigFile_PC.d23", "BigFile_PC.d24",
-                "BigFile_PC.d25", "BigFile_PC.d26", "BigFile_PC.d27", "BigFile_PC.d28",
-                "BigFile_PC.d29"
-            };
+                // Use only the specified files
+                fileNames = onlyExtractFiles.ToArray();
+            }
+            else
+            {
+                // Use the default file list
+                fileNames = new string[]
+                {
+                    "BigFile_PC.dat", "BigFile_PC.dep", "BigFile_PC.idx",
+                    "BigFile_PC.d01", "BigFile_PC.d02", "BigFile_PC.d03", "BigFile_PC.d04",
+                    "BigFile_PC.d05", "BigFile_PC.d06", "BigFile_PC.d07", "BigFile_PC.d08",
+                    "BigFile_PC.d09", "BigFile_PC.d10", "BigFile_PC.d11", "BigFile_PC.d12",
+                    "BigFile_PC.d13", "BigFile_PC.d14", "BigFile_PC.d15", "BigFile_PC.d16",
+                    "BigFile_PC.d17", "BigFile_PC.d18", "BigFile_PC.d19", "BigFile_PC.d20",
+                    "BigFile_PC.d21", "BigFile_PC.d22", "BigFile_PC.d23", "BigFile_PC.d24",
+                    "BigFile_PC.d25", "BigFile_PC.d26", "BigFile_PC.d27", "BigFile_PC.d28",
+                    "BigFile_PC.d29"
+                };
+            }
+            
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("Loading, scanning through, and extracting all BigFiles.\nFeel free to step away or work on something else. This will take a while! A message will be printed when the process finishes.");
+            if (onlyExtractFiles.Count > 0)
+            {
+                Console.WriteLine($"Loading, scanning through, and extracting {onlyExtractFiles.Count} specified files.\nFeel free to step away or work on something else. This will take a while! A message will be printed when the process finishes.");
+            }
+            else
+            {
+                Console.WriteLine("Loading, scanning through, and extracting all BigFiles.\nFeel free to step away or work on something else. This will take a while! A message will be printed when the process finishes.");
+            }
             Console.ResetColor();
 
-            Parser.Parser parser = new Parser.Parser(selectedLanguages);
+            Parser.Parser parser = new Parser.Parser(selectedLanguages, enableLogging, meltingPot);
             foreach (var fileName in fileNames)
             {
                 string filePath = Path.Combine(gamePath, fileName);
@@ -212,7 +281,7 @@ namespace DetroitAudioExtractor
             await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));
         }
 
-        static async Task ExtractWemOnlyFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles)
+        static async Task ExtractWemOnlyFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot)
         {
             await Task.Run(() => ExtractWemFilesFromBanks());
             await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));

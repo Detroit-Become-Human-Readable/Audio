@@ -35,10 +35,14 @@ namespace DetroitAudioExtractor.Parser
         };
 
         private readonly HashSet<string> selectedLanguages;
+        private readonly bool enableLogging;
+        private readonly bool meltingPot;
 
-        public Parser(IEnumerable<string> selectedLanguages)
+        public Parser(IEnumerable<string> selectedLanguages, bool enableLogging = false, bool meltingPot = false)
         {
             this.selectedLanguages = new HashSet<string>(selectedLanguages, StringComparer.OrdinalIgnoreCase);
+            this.enableLogging = enableLogging;
+            this.meltingPot = meltingPot;
         }
 
         public void Parse(string file)
@@ -59,6 +63,11 @@ namespace DetroitAudioExtractor.Parser
                 Directory.CreateDirectory("wem");
                 Directory.CreateDirectory(Path.Combine("wem", "dialogue"));
 
+                if (enableLogging)
+                {
+                    Directory.CreateDirectory("logging");
+                }
+
                 using (var mmf = MemoryMappedFile.CreateFromFile(file, FileMode.Open, null, 0, MemoryMappedFileAccess.Read))
                 {
                     using (var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read))
@@ -68,7 +77,12 @@ namespace DetroitAudioExtractor.Parser
                         accessor.ReadArray(0, fileBytes, 0, fileBytes.Length);
 
                         ExtractBanks(file, fileBytes, names);
-                        ExtractDialogue(fileBytes);
+                        
+                        // Only extract dialogue if languages are selected
+                        if (selectedLanguages.Count > 0)
+                        {
+                            ExtractDialogue(file, fileBytes);
+                        }
                     }
                 }
             }
@@ -106,6 +120,12 @@ namespace DetroitAudioExtractor.Parser
                         string filename = (count < names.Count) ? names[count] : $"UNK_BANK_{count}";
                         string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
                         File.WriteAllBytes(outputFilePath, FixBank(bankData));
+                        
+                        if (enableLogging)
+                        {
+                            LogBankExtraction(filename, file, offset);
+                        }
+                        
                         count++;
                     }
                 }
@@ -118,14 +138,14 @@ namespace DetroitAudioExtractor.Parser
             }
         }
 
-        private void ExtractDialogue(byte[] data)
+        private void ExtractDialogue(string file, byte[] data)
         {
             long[] qzipOffsets = SearchPattern(data, qzipPattern);
             foreach (long offset in qzipOffsets)
             {
                 try
                 {
-                    ExtractSingleDialogue(data, offset);
+                    ExtractSingleDialogue(file, data, offset);
                 }
                 catch (Exception ex)
                 {
@@ -136,7 +156,7 @@ namespace DetroitAudioExtractor.Parser
             }
         }
 
-        private void ExtractSingleDialogue(byte[] data, long offset)
+        private void ExtractSingleDialogue(string file, byte[] data, long offset)
         {
             int start = (int)(offset + qzipPattern.Length);
             if (start >= data.Length) return;
@@ -201,10 +221,10 @@ namespace DetroitAudioExtractor.Parser
             Console.ResetColor();
 
 
-            ExtractWemData(data, riffIndex, segments, fileName, languageFolder);
+            ExtractWemData(file, data, riffIndex, segments, fileName, languageFolder, offset);
         }
 
-        private void ExtractWemData(byte[] data, int wemStart, List<string> directories, string fileName, string languageFolder)
+        private void ExtractWemData(string file, byte[] data, int wemStart, List<string> directories, string fileName, string languageFolder, long offset)
         {
             int wemEnd = FindPattern(data, terminatorPattern, wemStart);
             if (wemEnd == -1) wemEnd = data.Length;
@@ -215,18 +235,42 @@ namespace DetroitAudioExtractor.Parser
             byte[] wemData = new byte[wemLength];
             Buffer.BlockCopy(data, wemStart, wemData, 0, wemLength);
 
-            // Save WEM
-            string wemOutputDir = Path.Combine("wem", "dialogue", languageFolder);
-            foreach (var dir in directories)
-            {
-                wemOutputDir = Path.Combine(wemOutputDir, dir);
-            }
-            Directory.CreateDirectory(wemOutputDir);
-
+            // Clean fileName to remove invalid characters
             fileName = string.Concat(fileName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
-            string wemOutputPath = Path.Combine(wemOutputDir, fileName + ".wem");
+
+            string wemOutputPath;
+            if (meltingPot)
+            {
+                // Flatten the folder structure by combining all path segments into the filename
+                var allSegments = new List<string>(directories) { fileName };
+                string flattenedFileName = string.Join("_", allSegments) + ".wem";
+                
+                // Create only the language folder, not the subdirectories
+                string wemOutputDir = Path.Combine("wem", "dialogue", languageFolder);
+                Directory.CreateDirectory(wemOutputDir);
+                
+                wemOutputPath = Path.Combine(wemOutputDir, flattenedFileName);
+            }
+            else
+            {
+                // Original behavior: create nested folder structure
+                string wemOutputDir = Path.Combine("wem", "dialogue", languageFolder);
+                foreach (var dir in directories)
+                {
+                    wemOutputDir = Path.Combine(wemOutputDir, dir);
+                }
+                Directory.CreateDirectory(wemOutputDir);
+                
+                wemOutputPath = Path.Combine(wemOutputDir, fileName + ".wem");
+            }
+
             File.WriteAllBytes(wemOutputPath, wemData);
             Console.WriteLine($"Extracted dialogue WEM: {wemOutputPath}");
+            
+            if (enableLogging)
+            {
+                LogDialogueExtraction(fileName, file, offset, languageFolder, string.Join("/", directories));
+            }
         }
 
         private static bool IsLargeNumeric(string segment)
@@ -269,6 +313,42 @@ namespace DetroitAudioExtractor.Parser
                 lastUnderscore = candidateStr.LastIndexOf('_', lastUnderscore - 1);
             }
             return null;
+        }
+
+        private void LogBankExtraction(string bankName, string sourceFile, long offset)
+        {
+            try
+            {
+                string logFileName = "bank_extraction_log.txt";
+                string logPath = Path.Combine("logging", logFileName);
+                string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | Bank: {bankName} | Source: {Path.GetFileName(sourceFile)} | Offset: 0x{offset:X8} ({offset})" + Environment.NewLine;
+                
+                File.AppendAllText(logPath, logEntry);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Failed to write bank extraction log: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        private void LogDialogueExtraction(string fileName, string sourceFile, long offset, string language, string directories)
+        {
+            try
+            {
+                string logFileName = "dialogue_extraction_log.txt";
+                string logPath = Path.Combine("logging", logFileName);
+                string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | Dialogue: {fileName} | Source: {Path.GetFileName(sourceFile)} | Offset: 0x{offset:X8} ({offset}) | Language: {language} | Path: {directories}" + Environment.NewLine;
+                
+                File.AppendAllText(logPath, logEntry);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Failed to write dialogue extraction log: {ex.Message}");
+                Console.ResetColor();
+            }
         }
 
         private string TryReadName(byte[] data, long nOffset)
