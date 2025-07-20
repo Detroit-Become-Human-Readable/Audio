@@ -220,7 +220,7 @@ namespace DetroitAudioExtractor
         static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot, List<string> onlyExtractFiles)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.1 By root-mega & BalancedLight");
+            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.4 By root-mega & BalancedLight");
             Console.ResetColor();
             Console.WriteLine("Enter your game folder directory: ");
             string gamePath = Console.ReadLine();

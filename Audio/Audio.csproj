@@ -15,7 +15,7 @@
     <Authors>root-mega, BalancedLight</Authors>
     <Product>Detroit Audio Extractor</Product>
     <Company>Detroit: Become Human Readable</Company>
-    <Version>0.3.3</Version>
+    <Version>0.3.4</Version>
     <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
     <FileVersion>$(PackageVersion)</FileVersion>
   </PropertyGroup>

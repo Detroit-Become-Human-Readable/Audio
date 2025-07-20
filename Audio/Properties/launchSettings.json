@@ -2,7 +2,7 @@
   "profiles": {
     "Audio": {
       "commandName": "Project",
-      "commandLineArgs": "--delete_errors\r\n--mark_music\r\n--english\r\n--logfile\r\n--meltingpot\r\n--onlyextract BigFile_PC.dat,BigFile_PC.d01"
+      "commandLineArgs": "--mark_music\r\n--english\r\n--logfile\r\n--meltingpot"
     }
   }
 }
