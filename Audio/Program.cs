@@ -220,7 +220,7 @@ namespace DetroitAudioExtractor
         static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot, List<string> onlyExtractFiles)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.1 By root-mega & BalancedLight");
+            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.4 By root-mega & BalancedLight");
             Console.ResetColor();
             Console.WriteLine("Enter your game folder directory: ");
             string gamePath = Console.ReadLine();
@@ -479,21 +479,24 @@ namespace DetroitAudioExtractor
 
             string ww2oggPath = Path.Combine(externPath, "ww2ogg.exe");
             string revorbPath = Path.Combine(externPath, "ReVorb.exe");
+            string codebooksPath = Path.Combine(externPath, "packed_codebooks_aoTuV_603.bin");
 
-            if (!System.IO.File.Exists(ww2oggPath))
+            bool needsWw2ogg = !System.IO.File.Exists(ww2oggPath) || !System.IO.File.Exists(codebooksPath);
+
+            if (needsWw2ogg)
             {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine("ww2ogg.exe not found. Downloading...");
-                Console.ResetColor();
-                await DownloadAndExtractWw2oggAsync(externPath).ConfigureAwait(false);
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("ww2ogg.exe or codebooks not found. Downloading ww2ogg...");
+            Console.ResetColor();
+            await DownloadAndExtractWw2oggAsync(externPath).ConfigureAwait(false);
             }
 
             if (!System.IO.File.Exists(revorbPath))
             {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine("ReVorb.exe not found. Downloading...");
-                Console.ResetColor();
-                await DownloadFileAsync("https://github.com/ItsBranK/ReVorb/releases/download/v1.0/ReVorb.exe", revorbPath).ConfigureAwait(false);
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("ReVorb.exe not found. Downloading ReVorb...");
+            Console.ResetColor();
+            await DownloadFileAsync("https://github.com/ItsBranK/ReVorb/releases/download/v1.0/ReVorb.exe", revorbPath).ConfigureAwait(false);
             }
         }
 
@@ -505,7 +508,7 @@ namespace DetroitAudioExtractor
             await DownloadFileAsync(url, zipPath).ConfigureAwait(false);
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine("Extracting ww2ogg...");
-            System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, destinationPath);
+            System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, destinationPath, true); // Overwrite existing files
             System.IO.File.Delete(zipPath);
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("ww2ogg extracted successfully.");

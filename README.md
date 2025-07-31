@@ -8,6 +8,7 @@
 4. Convert OGG to listenable OGG format.
 5. Mark possible music with a command line argument.
 6. Extract dialogue (experimental)
+7. Extract MIDI files
 
 ## Command Line Arguments
 `--logfile`
@@ -49,6 +50,3 @@ Instead of creating subfolders for dialogue, put them all into one folder. Might
 - Get file names for non-dialogue audio.
 - Improve dialogue extractor
 - Improve extraction speed
-  
-## READ
-This tool is WIP! It doesn't work yet fully, any contribution is appreciated!!!

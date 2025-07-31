@@ -14,6 +14,9 @@ namespace DetroitAudioExtractor.Parser
         private static readonly byte[] bnkNamePattern = { 0x43, 0x53, 0x4E, 0x44, 0x42, 0x4E, 0x4B, 0x5F }; // "CSNDBNK_"
         private static readonly byte[] qzipPattern = Encoding.ASCII.GetBytes("CSNDDATA");
         private static readonly byte[] riffPattern = Encoding.ASCII.GetBytes("RIFF");
+        private static readonly byte[] midiQzipPattern = { 0x51, 0x5A, 0x49, 0x50, 0x00, 0x52, 0x41, 0x57, 0x5F, 0x46, 0x49, 0x4C, 0x45 }; // "QZIP.RAW_FILE" where . is 0x00
+        private static readonly byte[] midiHeaderPattern = Encoding.ASCII.GetBytes("MIDI");
+        private static readonly byte[] mthdPattern = Encoding.ASCII.GetBytes("MThd");
 
         private static readonly byte[] terminatorPattern = Enumerable.Repeat((byte)0x2D, 6).ToArray();
 
@@ -78,6 +81,8 @@ namespace DetroitAudioExtractor.Parser
 
                         ExtractBanks(file, fileBytes, names);
                         
+                        ExtractMidi(file, fileBytes);
+                        
                         // Only extract dialogue if languages are selected
                         if (selectedLanguages.Count > 0)
                         {
@@ -118,6 +123,8 @@ namespace DetroitAudioExtractor.Parser
                     if (bankData != null && bankData.Length > 0)
                     {
                         string filename = (count < names.Count) ? names[count] : $"UNK_BANK_{count}";
+                        filename = SanitizeFilename(filename);
+                        
                         string outputFilePath = Path.Combine("banks", $"{filename}.bnk");
                         File.WriteAllBytes(outputFilePath, FixBank(bankData));
                         
@@ -153,6 +160,192 @@ namespace DetroitAudioExtractor.Parser
                     Console.WriteLine($"Error extracting dialogue at offset {offset}: {ex.Message}");
                     Console.ResetColor();
                 }
+            }
+        }
+
+        private void ExtractMidi(string file, byte[] data)
+        {
+            Directory.CreateDirectory("midi");
+            
+            long[] midiQzipOffsets = SearchPattern(data, midiQzipPattern);
+            int midiCount = 0;
+            
+            foreach (long offset in midiQzipOffsets)
+            {
+                try
+                {
+                    ExtractSingleMidi(file, data, offset, ref midiCount);
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Error extracting MIDI at offset {offset}: {ex.Message}");
+                    Console.ResetColor();
+                }
+            }
+            
+            if (midiCount > 0)
+            {
+                Console.WriteLine($"Extracted {midiCount} MIDI files.");
+                Console.ResetColor();
+            }
+        }
+
+        private void ExtractSingleMidi(string file, byte[] data, long offset, ref int midiCount)
+        {
+            // Look for MIDI header 12 bytes after QZIP.RAW_FILE
+            int midiHeaderStart = (int)(offset + midiQzipPattern.Length + 12);
+            if (midiHeaderStart + midiHeaderPattern.Length >= data.Length) return;
+            
+            // Verify MIDI header exists
+            bool midiHeaderFound = true;
+            for (int i = 0; i < midiHeaderPattern.Length; i++)
+            {
+                if (data[midiHeaderStart + i] != midiHeaderPattern[i])
+                {
+                    midiHeaderFound = false;
+                    break;
+                }
+            }
+            
+            if (!midiHeaderFound) return;
+            
+            // Look for MThd header 4 bytes after MIDI
+            int mthdStart = midiHeaderStart + midiHeaderPattern.Length + 4;
+            if (mthdStart + mthdPattern.Length >= data.Length) return;
+            
+            // Verify MThd header exists
+            bool mthdHeaderFound = true;
+            for (int i = 0; i < mthdPattern.Length; i++)
+            {
+                if (data[mthdStart + i] != mthdPattern[i])
+                {
+                    mthdHeaderFound = false;
+                    break;
+                }
+            }
+            
+            if (!mthdHeaderFound) return;
+            
+            // Extract name from MIDI track data
+            string midiName = ExtractMidiName(data, mthdStart, midiCount);
+            
+            // Find the actual start of MIDI data (MThd header)
+            int midiDataStart = mthdStart;
+            
+            // Find the end of MIDI data (terminator pattern)
+            int midiEnd = FindPattern(data, terminatorPattern, midiDataStart);
+            if (midiEnd == -1) midiEnd = data.Length;
+            
+            int midiLength = midiEnd - midiDataStart;
+            if (midiLength <= 0) return;
+            
+            byte[] midiData = new byte[midiLength];
+            Buffer.BlockCopy(data, midiDataStart, midiData, 0, midiLength);
+            
+            string outputPath = Path.Combine("midi", $"{midiName}.mid");
+            File.WriteAllBytes(outputPath, midiData);
+            
+            Console.WriteLine($"Extracted MIDI: {outputPath}");
+            Console.ResetColor();
+            
+            if (enableLogging)
+            {
+                LogMidiExtraction(midiName, file, offset);
+            }
+            
+            midiCount++;
+        }
+
+        private string ExtractMidiName(byte[] data, int midiDataStart, int midiCount)
+        {
+            // Look for MTrk header first
+            byte[] mtrkPattern = Encoding.ASCII.GetBytes("MTrk");
+            int mtrkIndex = FindPattern(data, mtrkPattern, midiDataStart);
+            
+            if (mtrkIndex == -1 || mtrkIndex + 8 >= data.Length)
+            {
+                return $"UnknownMidi_{midiCount}";
+            }
+            
+            // Skip MTrk header (4 bytes) + track length (4 bytes) + some metadata bytes
+            int searchStart = mtrkIndex + 8;
+            int searchEnd = Math.Min(searchStart + 200, data.Length); // Limit search range
+            
+            // Look for MIDI meta-event FF (0xFF) followed by track name event
+            for (int i = searchStart; i < searchEnd - 1; i++)
+            {
+                if (data[i] == 0xFF)
+                {
+                    // Check for track name meta-event (0xFF 0x03) or sequence name (0xFF 0x01)
+                    if (i + 1 < searchEnd && (data[i + 1] == 0x03 || data[i + 1] == 0x01))
+                    {
+                        // Next byte should be the length of the name
+                        if (i + 2 < searchEnd)
+                        {
+                            int nameLength = data[i + 2];
+                            if (nameLength > 0 && nameLength < 100 && i + 3 + nameLength <= searchEnd)
+                            {
+                                byte[] nameBytes = new byte[nameLength];
+                                Buffer.BlockCopy(data, i + 3, nameBytes, 0, nameLength);
+                                
+                                string name = Encoding.ASCII.GetString(nameBytes).Trim();
+                                
+                                string cleanName = string.Concat(name.Where(c => c >= 32 && c <= 126));
+                                cleanName = string.Concat(cleanName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+                                
+                                if (!string.IsNullOrEmpty(cleanName) && cleanName.Length > 2)
+                                {
+                                    return cleanName;
+                                }
+                            }
+                        }
+                    }
+                    // Also check for other potential text metadata
+                    else if (i + 1 < searchEnd && data[i + 1] >= 0x01 && data[i + 1] <= 0x0F)
+                    {
+                        if (i + 2 < searchEnd)
+                        {
+                            int nameLength = data[i + 2];
+                            if (nameLength > 5 && nameLength < 100 && i + 3 + nameLength <= searchEnd)
+                            {
+                                byte[] nameBytes = new byte[nameLength];
+                                Buffer.BlockCopy(data, i + 3, nameBytes, 0, nameLength);
+                                
+                                string name = Encoding.ASCII.GetString(nameBytes).Trim();
+                                string cleanName = string.Concat(name.Where(c => c >= 32 && c <= 126));
+                                cleanName = string.Concat(cleanName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+                                
+                                if (!string.IsNullOrEmpty(cleanName) && cleanName.Length > 5 && 
+                                    cleanName.Any(char.IsLetter))
+                                {
+                                    return cleanName;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // No valid name found! Use a default name
+            return $"UnknownMidi_{midiCount}";
+        }
+
+        private void LogMidiExtraction(string midiName, string sourceFile, long offset)
+        {
+            try
+            {
+                string logFileName = "midi_extraction_log.txt";
+                string logPath = Path.Combine("logging", logFileName);
+                string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | MIDI: {midiName} | Source: {Path.GetFileName(sourceFile)} | Offset: 0x{offset:X8} ({offset})" + Environment.NewLine;
+                
+                File.AppendAllText(logPath, logEntry);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Failed to write MIDI extraction log: {ex.Message}");
+                Console.ResetColor();
             }
         }
 
@@ -293,6 +486,43 @@ namespace DetroitAudioExtractor.Parser
                 }
             }
             return sb.ToString().Trim();
+        }
+
+        private static string SanitizeFilename(string filename)
+        {
+            if (string.IsNullOrEmpty(filename))
+            {
+                return "UnknownFile";
+            }
+
+            // Remove invalid characters
+            var sb = new StringBuilder();
+            foreach (char c in filename)
+            {
+                if (c == '\0' || c < 32)
+                    continue;
+                
+                if (Path.GetInvalidFileNameChars().Contains(c))
+                    continue;
+                
+                sb.Append(c);
+            }
+
+            string sanitized = sb.ToString().Trim();
+            
+            // If the result is empty or only contains dots/spaces, generate a safe name
+            if (string.IsNullOrWhiteSpace(sanitized) || sanitized.All(c => c == '.' || c == ' '))
+            {
+                return "UnknownFile";
+            }
+
+            // Limit length to prevent overly long filenames
+            if (sanitized.Length > 200)
+            {
+                sanitized = sanitized.Substring(0, 200);
+            }
+
+            return sanitized;
         }
 
         private static string ExtractLanguageCodeFromEnd(ref string candidateStr)
