@@ -2,7 +2,7 @@
   "profiles": {
     "Audio": {
       "commandName": "Project",
-      "commandLineArgs": "--mark_music\r\n--english\r\n--logfile\r\n--meltingpot"
+      "commandLineArgs": "--english\r\n--logfile\r\n--meltingpot"
     }
   }
 }

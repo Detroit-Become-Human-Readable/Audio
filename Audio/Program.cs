@@ -3,15 +3,25 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Audio.Parser;
-using TagLib;
     
 namespace DetroitAudioExtractor
 {
     class Program
     {
+        private sealed class ProcessResult
+        {
+            public bool Success { get; init; }
+            public int ExitCode { get; init; }
+            public string Output { get; init; } = string.Empty;
+            public string Error { get; init; } = string.Empty;
+            public string FailureMessage { get; init; } = string.Empty;
+        }
+
         enum StartAction
         {
             NormalFlow,         // Parse bigfiles and extract banks/WEM normally
@@ -24,10 +34,13 @@ namespace DetroitAudioExtractor
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
 
+            args = PromptForArgumentsIfNone(args);
+
             bool deleteErrorFiles = args.Contains("--delete-errors", StringComparer.OrdinalIgnoreCase) || args.Contains("--delete_errors", StringComparer.OrdinalIgnoreCase);
-            bool markPossibleMusicFiles = args.Contains("--mark-music", StringComparer.OrdinalIgnoreCase) || args.Contains("--mark_music", StringComparer.OrdinalIgnoreCase);
+            bool deprecatedMarkMusicArg = args.Contains("--mark-music", StringComparer.OrdinalIgnoreCase) || args.Contains("--mark_music", StringComparer.OrdinalIgnoreCase);
             bool enableLogging = args.Contains("--logfile", StringComparer.OrdinalIgnoreCase);
             bool meltingPot = args.Contains("--meltingpot", StringComparer.OrdinalIgnoreCase);
+            int conversionJobs = ParseConversionJobs(args);
             
             List<string> onlyExtractFiles = new List<string>();
             for (int i = 0; i < args.Length; i++)
@@ -48,10 +61,10 @@ namespace DetroitAudioExtractor
                 Console.ResetColor();
             }
 
-            if (markPossibleMusicFiles)
+            if (deprecatedMarkMusicArg)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("Arg: Mark possible music files enabled.");
+                Console.WriteLine("Arg: --mark-music is deprecated. Bank audio is now split into SFX/MUS/VO/UNKNOWN folders automatically.");
                 Console.ResetColor();
             }
 
@@ -75,6 +88,10 @@ namespace DetroitAudioExtractor
                 Console.WriteLine($"Arg: Only extract mode enabled - processing {onlyExtractFiles.Count} specific files: {string.Join(", ", onlyExtractFiles)}");
                 Console.ResetColor();
             }
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Arg: WEM->OGG conversion parallelism set to {conversionJobs} worker(s).");
+            Console.ResetColor();
 
             // New code to parse language arguments
             List<string> selectedLanguages = new List<string>();
@@ -153,13 +170,13 @@ namespace DetroitAudioExtractor
                 switch (action)
                 {
                     case StartAction.NormalFlow:
-                        await RunNormalFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles, enableLogging, meltingPot, onlyExtractFiles).ConfigureAwait(false);
+                        await RunNormalFlowAsync(selectedLanguages, deleteErrorFiles, enableLogging, meltingPot, onlyExtractFiles, conversionJobs).ConfigureAwait(false);
                         break;
                     case StartAction.ExtractWemOnly:
-                        await ExtractWemOnlyFlowAsync(selectedLanguages, deleteErrorFiles, markPossibleMusicFiles, enableLogging, meltingPot).ConfigureAwait(false);
+                        await ExtractWemOnlyFlowAsync(deleteErrorFiles, conversionJobs).ConfigureAwait(false);
                         break;
                     case StartAction.OggAndRevorbOnly:
-                        ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles);
+                        await ConvertWemToOggAndRevorbAsync(deleteErrorFiles, conversionJobs).ConfigureAwait(false);
                         break;
                     case StartAction.Exit:
                         Console.WriteLine("No further actions selected. Exiting program.");
@@ -186,6 +203,236 @@ namespace DetroitAudioExtractor
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey();
             }
+        }
+
+        static string[] PromptForArgumentsIfNone(string[] args)
+        {
+            if (args.Length > 0)
+            {
+                return args;
+            }
+
+            List<string> selectedArgs = new List<string>();
+            string? onlyExtractFiles = null;
+            int? selectedConversionJobs = null;
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("No command-line arguments were provided.");
+            Console.ResetColor();
+            Console.WriteLine("Pick any startup options below, then choose Continue.");
+
+            while (true)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Command options:");
+                Console.WriteLine($"  1. Toggle English dialogue extraction      [{OptionState(selectedArgs.Contains("--english"))}]");
+                Console.WriteLine($"  2. Toggle all dialogue languages          [{OptionState(selectedArgs.Contains("--all_lang"))}]");
+                Console.WriteLine($"  3. Toggle logging                         [{OptionState(selectedArgs.Contains("--logfile"))}]");
+                Console.WriteLine($"  4. Toggle melting pot dialogue output     [{OptionState(selectedArgs.Contains("--meltingpot"))}]");
+                Console.WriteLine($"  5. Toggle delete failed OGG files         [{OptionState(selectedArgs.Contains("--delete-errors"))}]");
+                Console.WriteLine($"  6. Set only-extract BigFile list          [{(string.IsNullOrWhiteSpace(onlyExtractFiles) ? "not set" : onlyExtractFiles)}]");
+                Console.WriteLine($"  7. Set max conversion jobs               [{FormatConversionJobsSelection(selectedConversionJobs)}]");
+                Console.WriteLine("  8. Show language options");
+                Console.WriteLine("  9. Clear selected options");
+                Console.WriteLine(" 10. Continue");
+                Console.Write("Select a number: ");
+
+                string? input = Console.ReadLine();
+                switch (input?.Trim())
+                {
+                    case "1":
+                        ToggleArg(selectedArgs, "--english");
+                        if (selectedArgs.Contains("--english"))
+                        {
+                            selectedArgs.Remove("--all_lang");
+                        }
+                        break;
+                    case "2":
+                        ToggleArg(selectedArgs, "--all_lang");
+                        if (selectedArgs.Contains("--all_lang"))
+                        {
+                            RemoveLanguageArgs(selectedArgs);
+                        }
+                        break;
+                    case "3":
+                        ToggleArg(selectedArgs, "--logfile");
+                        break;
+                    case "4":
+                        ToggleArg(selectedArgs, "--meltingpot");
+                        break;
+                    case "5":
+                        ToggleArg(selectedArgs, "--delete-errors");
+                        break;
+                    case "6":
+                        Console.Write("Enter BigFile names separated by commas, or leave blank to clear: ");
+                        onlyExtractFiles = Console.ReadLine()?.Trim();
+                        if (string.IsNullOrWhiteSpace(onlyExtractFiles))
+                        {
+                            onlyExtractFiles = null;
+                        }
+                        break;
+                    case "7":
+                        selectedConversionJobs = PromptForConversionJobs(selectedConversionJobs);
+                        break;
+                    case "8":
+                        PromptLanguageArguments(selectedArgs);
+                        break;
+                    case "9":
+                        selectedArgs.Clear();
+                        onlyExtractFiles = null;
+                        selectedConversionJobs = null;
+                        Console.WriteLine("Selected options cleared.");
+                        break;
+                    case "10":
+                    case "":
+                        if (!string.IsNullOrWhiteSpace(onlyExtractFiles))
+                        {
+                            selectedArgs.Add("--onlyextract");
+                            selectedArgs.Add(onlyExtractFiles);
+                        }
+                        ApplyConversionJobsArg(selectedArgs, selectedConversionJobs);
+                        Console.WriteLine(selectedArgs.Count == 0
+                            ? "Continuing with no startup arguments."
+                            : $"Continuing with: {string.Join(" ", selectedArgs)}");
+                        return selectedArgs.ToArray();
+                    default:
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("Invalid selection. Enter a number from the list.");
+                        Console.ResetColor();
+                        break;
+                }
+            }
+        }
+
+        static void PromptLanguageArguments(List<string> selectedArgs)
+        {
+            string[] languageArgs =
+            {
+                "--english", "--mexican", "--brazilian", "--french", "--arabic", "--russian",
+                "--polish", "--portuguese", "--italian", "--german", "--spanish", "--japanese"
+            };
+
+            while (true)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Language options:");
+                for (int i = 0; i < languageArgs.Length; i++)
+                {
+                    string languageArg = languageArgs[i];
+                    Console.WriteLine($"  {i + 1}. Toggle {languageArg.TrimStart('-')} [{OptionState(selectedArgs.Contains(languageArg))}]");
+                }
+                Console.WriteLine($"  {languageArgs.Length + 1}. Clear language selections");
+                Console.WriteLine($"  {languageArgs.Length + 2}. Back");
+                Console.Write("Select a number: ");
+
+                string? input = Console.ReadLine();
+                if (!int.TryParse(input, out int choice))
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Invalid selection. Enter a number from the list.");
+                    Console.ResetColor();
+                    continue;
+                }
+
+                if (choice >= 1 && choice <= languageArgs.Length)
+                {
+                    selectedArgs.Remove("--all_lang");
+                    ToggleArg(selectedArgs, languageArgs[choice - 1]);
+                }
+                else if (choice == languageArgs.Length + 1)
+                {
+                    RemoveLanguageArgs(selectedArgs);
+                    Console.WriteLine("Language selections cleared.");
+                }
+                else if (choice == languageArgs.Length + 2)
+                {
+                    return;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Invalid selection. Enter a number from the list.");
+                    Console.ResetColor();
+                }
+            }
+        }
+
+        static void ToggleArg(List<string> selectedArgs, string arg)
+        {
+            if (selectedArgs.Contains(arg))
+            {
+                selectedArgs.Remove(arg);
+            }
+            else
+            {
+                selectedArgs.Add(arg);
+            }
+        }
+
+        static int? PromptForConversionJobs(int? currentSelection)
+        {
+            Console.Write($"Enter max conversion jobs (current: {FormatConversionJobsSelection(currentSelection)}). Leave blank for auto: ");
+            string? input = Console.ReadLine()?.Trim();
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null;
+            }
+
+            if (int.TryParse(input, out int jobs) && jobs > 0)
+            {
+                return jobs;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Invalid value. Keeping the previous conversion job setting.");
+            Console.ResetColor();
+            return currentSelection;
+        }
+
+        static string FormatConversionJobsSelection(int? selectedJobs)
+        {
+            return selectedJobs.HasValue ? selectedJobs.Value.ToString() : $"auto ({GetDefaultConversionJobs()})";
+        }
+
+        static void ApplyConversionJobsArg(List<string> selectedArgs, int? selectedJobs)
+        {
+            for (int i = selectedArgs.Count - 2; i >= 0; i--)
+            {
+                if (!selectedArgs[i].Equals("--jobs", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                selectedArgs.RemoveAt(i + 1);
+                selectedArgs.RemoveAt(i);
+            }
+
+            if (!selectedJobs.HasValue)
+            {
+                return;
+            }
+
+            selectedArgs.Add("--jobs");
+            selectedArgs.Add(selectedJobs.Value.ToString());
+        }
+
+        static void RemoveLanguageArgs(List<string> selectedArgs)
+        {
+            string[] languageArgs =
+            {
+                "--english", "--mexican", "--brazilian", "--french", "--arabic", "--russian",
+                "--polish", "--portuguese", "--italian", "--german", "--spanish", "--japanese"
+            };
+
+            foreach (string languageArg in languageArgs)
+            {
+                selectedArgs.Remove(languageArg);
+            }
+        }
+
+        static string OptionState(bool enabled)
+        {
+            return enabled ? "on" : "off";
         }
 
         static StartAction InitialStateCheck()
@@ -217,10 +464,10 @@ namespace DetroitAudioExtractor
             return StartAction.NormalFlow;
         }
 
-        static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot, List<string> onlyExtractFiles)
+        static async Task RunNormalFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool enableLogging, bool meltingPot, List<string> onlyExtractFiles, int conversionJobs)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.3.4 By root-mega & BalancedLight");
+            Console.WriteLine("Audio extractor for Detroit: Become Human. v0.4.0 By root-mega & BalancedLight");
             Console.ResetColor();
             Console.WriteLine("Enter your game folder directory: ");
             string gamePath = Console.ReadLine();
@@ -278,13 +525,13 @@ namespace DetroitAudioExtractor
             }
 
             await Task.Run(() => ExtractWemFilesFromBanks());
-            await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));
+            await ConvertWemToOggAndRevorbAsync(deleteErrorFiles, conversionJobs).ConfigureAwait(false);
         }
 
-        static async Task ExtractWemOnlyFlowAsync(List<string> selectedLanguages, bool deleteErrorFiles, bool markPossibleMusicFiles, bool enableLogging, bool meltingPot)
+        static async Task ExtractWemOnlyFlowAsync(bool deleteErrorFiles, int conversionJobs)
         {
             await Task.Run(() => ExtractWemFilesFromBanks());
-            await Task.Run(() => ConvertWemToOggAndRevorb(deleteErrorFiles, markPossibleMusicFiles));
+            await ConvertWemToOggAndRevorbAsync(deleteErrorFiles, conversionJobs).ConfigureAwait(false);
         }
 
         static void ExtractWemFilesFromBanks()
@@ -310,7 +557,7 @@ namespace DetroitAudioExtractor
             }
         }
 
-        static void ConvertWemToOggAndRevorb(bool deleteErrorFiles, bool markPossibleMusicFiles)
+        static async Task ConvertWemToOggAndRevorbAsync(bool deleteErrorFiles, int maxParallelism)
         {
             try
             {
@@ -331,66 +578,150 @@ namespace DetroitAudioExtractor
                 string oggRoot = Path.Combine(".", "ogg");
                 Directory.CreateDirectory(oggRoot);
 
-                foreach (var wemFile in Directory.GetFiles(wemRoot, "*.wem", SearchOption.AllDirectories))
+                string[] wemFiles = Directory.GetFiles(wemRoot, "*.wem", SearchOption.AllDirectories);
+                if (wemFiles.Length == 0)
                 {
-                    Console.WriteLine($"Processing file: {wemFile}");
-                    string relativePath = Path.GetRelativePath(wemRoot, wemFile);
-                    string oggOutputPath = Path.Combine(oggRoot, Path.ChangeExtension(relativePath, ".ogg"));
-                    string oggSubDir = Path.GetDirectoryName(oggOutputPath);
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("No WEM files found to convert to OGG.");
+                    Console.ResetColor();
+                    return;
+                }
 
-                    Directory.CreateDirectory(oggSubDir);
+                int workerCount = NormalizeParallelism(maxParallelism, wemFiles.Length);
+                int processed = 0;
+                int converted = 0;
+                int skipped = 0;
+                int failed = 0;
+                object consoleLock = new object();
+                var failures = new ConcurrentQueue<string>();
 
-                    bool ww2oggSuccess = RunProcess(ww2oggPath, $"\"{wemFile}\" --pcb \"{codebooksPath}\" -o \"{oggOutputPath}\"");
-                    if (!ww2oggSuccess)
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"Converting {wemFiles.Length} WEM file(s) using {workerCount} parallel worker(s)...");
+                Console.ResetColor();
+
+                await Parallel.ForEachAsync(
+                    wemFiles,
+                    new ParallelOptions { MaxDegreeOfParallelism = workerCount },
+                    async (wemFile, cancellationToken) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Failed to convert WEM to OGG for file: {wemFile}");
-                        Console.ResetColor();
-                        if (deleteErrorFiles && System.IO.File.Exists(oggOutputPath))
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        string relativePath = Path.GetRelativePath(wemRoot, wemFile);
+                        string oggOutputPath = Path.Combine(oggRoot, Path.ChangeExtension(relativePath, ".ogg"));
+                        string? oggSubDir = Path.GetDirectoryName(oggOutputPath);
+                        if (string.IsNullOrEmpty(oggSubDir))
                         {
-                            System.IO.File.Delete(oggOutputPath);
+                            oggSubDir = oggRoot;
                         }
-                        continue;
-                    }
+                        Directory.CreateDirectory(oggSubDir);
 
-                    string tempOggFile = Path.Combine(oggSubDir, Path.GetFileNameWithoutExtension(wemFile) + "_fixed.ogg");
-                    bool revorbSuccess = RunProcess(revorbPath, $"\"{oggOutputPath}\" \"{tempOggFile}\"");
+                        if (ShouldSkipOggConversion(wemFile, oggOutputPath))
+                        {
+                            int processedCount = Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref skipped);
+                            lock (consoleLock)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                Console.WriteLine($"[{processedCount}/{wemFiles.Length}] Skipping up-to-date file: {relativePath}");
+                                Console.ResetColor();
+                            }
+                            return;
+                        }
 
-                    if (revorbSuccess)
-                    {
-                        // Replace original with fixed
+                        ProcessResult ww2oggResult = await RunProcessAsync(
+                            ww2oggPath,
+                            $"\"{wemFile}\" --pcb \"{codebooksPath}\" -o \"{oggOutputPath}\"",
+                            cancellationToken).ConfigureAwait(false);
+                        if (!ww2oggResult.Success)
+                        {
+                            int processedCount = Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref failed);
+                            failures.Enqueue(relativePath);
+                            lock (consoleLock)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"[{processedCount}/{wemFiles.Length}] Failed ww2ogg conversion: {relativePath}");
+                                WriteProcessFailureDetails(ww2oggPath, relativePath, ww2oggResult);
+                                Console.ResetColor();
+                            }
+                            if (deleteErrorFiles)
+                            {
+                                TryDeleteFile(oggOutputPath);
+                            }
+                            return;
+                        }
+
+                        string tempOggFile = oggOutputPath + ".revorb.tmp";
+                        ProcessResult revorbResult = await RunProcessAsync(
+                            revorbPath,
+                            $"\"{oggOutputPath}\" \"{tempOggFile}\"",
+                            cancellationToken).ConfigureAwait(false);
+                        if (!revorbResult.Success)
+                        {
+                            int processedCount = Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref failed);
+                            failures.Enqueue(relativePath);
+                            lock (consoleLock)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"[{processedCount}/{wemFiles.Length}] Failed ReVorb step: {relativePath}");
+                                WriteProcessFailureDetails(revorbPath, relativePath, revorbResult);
+                                Console.ResetColor();
+                            }
+                            if (deleteErrorFiles)
+                            {
+                                TryDeleteFile(oggOutputPath);
+                            }
+                            TryDeleteFile(tempOggFile);
+                            return;
+                        }
+
                         try
                         {
-                            System.IO.File.Delete(oggOutputPath);
-                            System.IO.File.Move(tempOggFile, oggOutputPath);
-
-                            // Mark possible music files if stereo or quad, and 48kHz, or if the directory name contains "music"
-                            if (markPossibleMusicFiles)
+                            if (System.IO.File.Exists(oggOutputPath))
                             {
-                                using var file = TagLib.File.Create(oggOutputPath);
-                                if (
-                                    ((file.Properties.AudioChannels == 2 || file.Properties.AudioChannels == 4) && 
-                                    file.Properties.AudioSampleRate == 48000) ||
-                                    (oggSubDir != null && 
-                                    oggSubDir.Contains("music", StringComparison.OrdinalIgnoreCase))
-                                )
-                                {
-                                    file.Tag.Comment = "Possible music file";
-                                    file.Save();
-                                }
+                                System.IO.File.Delete(oggOutputPath);
+                            }
+                            System.IO.File.Move(tempOggFile, oggOutputPath);
+                            int processedCount = Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref converted);
+                            lock (consoleLock)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"[{processedCount}/{wemFiles.Length}] Converted: {relativePath}");
+                                Console.ResetColor();
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine($"An error occurred during OGG/ReVorb steps: {ex.Message}");
-                            Console.ResetColor();
+                            int processedCount = Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref failed);
+                            failures.Enqueue(relativePath);
+                            TryDeleteFile(tempOggFile);
+                            lock (consoleLock)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"[{processedCount}/{wemFiles.Length}] Failed finalizing OGG for {relativePath}: {ex.Message}");
+                                Console.ResetColor();
+                            }
                         }
-                    }
-                }
+
+                    }).ConfigureAwait(false);
+
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("WEM files extracted and converted. Check the 'ogg' directory.");
+                Console.WriteLine($"WEM conversion finished. Converted: {converted}, skipped: {skipped}, failed: {failed}. Check the 'ogg' directory.");
                 Console.ResetColor();
+
+                if (!failures.IsEmpty)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Failed files:");
+                    foreach (string failedFile in failures.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($" - {failedFile}");
+                    }
+                    Console.ResetColor();
+                }
             }
             catch (Exception ex)
             {
@@ -398,6 +729,80 @@ namespace DetroitAudioExtractor
                 Console.WriteLine($"An error occurred during OGG/ReVorb steps: {ex.Message}");
                 Console.ResetColor();
             }
+        }
+
+        static bool ShouldSkipOggConversion(string wemFile, string oggOutputPath)
+        {
+            if (!System.IO.File.Exists(oggOutputPath))
+            {
+                return false;
+            }
+
+            DateTime wemTimestamp = System.IO.File.GetLastWriteTimeUtc(wemFile);
+            DateTime oggTimestamp = System.IO.File.GetLastWriteTimeUtc(oggOutputPath);
+            return oggTimestamp >= wemTimestamp;
+        }
+
+        static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    System.IO.File.Delete(path);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        static int ParseConversionJobs(string[] args)
+        {
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (!args[i].Equals("--jobs", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (int.TryParse(args[i + 1], out int parsedJobs) && parsedJobs > 0)
+                {
+                    return parsedJobs;
+                }
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Warning: Invalid value for --jobs: {args[i + 1]}. Using default parallelism.");
+                Console.ResetColor();
+                break;
+            }
+
+            return GetDefaultConversionJobs();
+        }
+
+        static int GetDefaultConversionJobs()
+        {
+            if (Environment.ProcessorCount <= 2)
+            {
+                return 1;
+            }
+
+            return Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
+        }
+
+        static int NormalizeParallelism(int requestedJobs, int fileCount)
+        {
+            if (fileCount <= 0)
+            {
+                return 1;
+            }
+
+            if (requestedJobs <= 0)
+            {
+                requestedJobs = GetDefaultConversionJobs();
+            }
+
+            return Math.Clamp(requestedJobs, 1, fileCount);
         }
 
         static char PromptChoice(char[] validChoices)
@@ -428,7 +833,42 @@ namespace DetroitAudioExtractor
             return Directory.EnumerateFileSystemEntries(path).Any();
         }
 
-        static bool RunProcess(string fileName, string arguments)
+        static void WriteProcessFailureDetails(string toolPath, string relativePath, ProcessResult result)
+        {
+            string toolName = Path.GetFileName(toolPath);
+            if (!string.IsNullOrWhiteSpace(result.FailureMessage))
+            {
+                Console.WriteLine($"  {toolName}: {result.FailureMessage}");
+            }
+            else
+            {
+                Console.WriteLine($"  {toolName}: exited with code {result.ExitCode} while processing {relativePath}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Output))
+            {
+                Console.WriteLine("  StdOut:");
+                foreach (string line in result.Output
+                    .Replace("\r\n", "\n", StringComparison.Ordinal)
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    Console.WriteLine($"    {line}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                Console.WriteLine("  StdErr:");
+                foreach (string line in result.Error
+                    .Replace("\r\n", "\n", StringComparison.Ordinal)
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    Console.WriteLine($"    {line}");
+                }
+            }
+        }
+
+        static async Task<ProcessResult> RunProcessAsync(string fileName, string arguments, CancellationToken cancellationToken)
         {
             var processInfo = new ProcessStartInfo
             {
@@ -445,29 +885,60 @@ namespace DetroitAudioExtractor
                 try
                 {
                     process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
+                    Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                    Task<string> errorTask = process.StandardError.ReadToEndAsync();
+                    await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                    string output = await outputTask.ConfigureAwait(false);
+                    string error = await errorTask.ConfigureAwait(false);
 
                     if (process.ExitCode != 0)
                     {
-                        Console.WriteLine($"Error running {fileName} {arguments} - Exit code: {process.ExitCode}");
-                        if (!string.IsNullOrEmpty(output)) Console.WriteLine($"StdOut: {output}");
-                        if (!string.IsNullOrEmpty(error)) Console.WriteLine($"StdErr: {error}");
-                        return false;
+                        return new ProcessResult
+                        {
+                            Success = false,
+                            ExitCode = process.ExitCode,
+                            Output = output,
+                            Error = error,
+                            FailureMessage = $"Exit code {process.ExitCode}"
+                        };
                     }
-                    else if (!string.IsNullOrEmpty(output))
+
+                    return new ProcessResult
                     {
-                        Console.WriteLine($"StdOut: {output}");
+                        Success = true,
+                        ExitCode = process.ExitCode,
+                        Output = output,
+                        Error = error
+                    };
+                }
+                catch (OperationCanceledException)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill(entireProcessTree: true);
+                        }
                     }
-                    return true;
+                    catch
+                    {
+                    }
+
+                    return new ProcessResult
+                    {
+                        Success = false,
+                        ExitCode = -1,
+                        FailureMessage = "Process was cancelled."
+                    };
                 }
                 catch (Exception ex)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Failed to run process {fileName}: {ex.Message}");
-                    Console.ResetColor();
-                    return false;
+                    return new ProcessResult
+                    {
+                        Success = false,
+                        ExitCode = -1,
+                        FailureMessage = $"Failed to start process: {ex.Message}"
+                    };
                 }
             }
         }
