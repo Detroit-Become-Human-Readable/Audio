@@ -11,7 +11,7 @@ jobs:
       - run: dotnet build DetroitAudio.slnx -c Release -p:AutoPublish=false
       - run: dotnet test DetroitAudio.slnx -c Release --no-build -p:AutoPublish=false
       - shell: pwsh
-        run: ./scripts/Test-AutoPublish.ps1
+        run: ./scripts/Test-AutoPublishExit.ps1
       - shell: pwsh
         run: ./scripts/Test-Publish.ps1
       - shell: powershell

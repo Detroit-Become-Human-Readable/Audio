@@ -61,3 +61,5 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
     if (!$resolved.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or !(Split-Path -Leaf $resolved).StartsWith('detroit-auto-publish-')) { throw 'Invalid test cleanup path.' }
     Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction SilentlyContinue
 }
+# Expected native failures were verified above; expose success to the Actions runner.
+$global:LASTEXITCODE = 0
