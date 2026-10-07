@@ -1,7 +1,19 @@
 .vs
+.vscode
 .editorconfig
 bin/
 build_out/
 x64/
 obj
 /UpgradeLog.htm
+artifacts/
+.local/
+TestResults/
+*.user
+*.db
+*.db-shm
+*.db-wal
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include="../DetroitAudio.Core/DetroitAudio.Core.csproj" /><ProjectReference Include="../DetroitAudio.Audio/DetroitAudio.Audio.csproj" /></ItemGroup></Project>

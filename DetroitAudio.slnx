@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DetroitAudio.Core/DetroitAudio.Core.csproj" />
+    <Project Path="src/DetroitAudio.Formats/DetroitAudio.Formats.csproj" />
+    <Project Path="src/DetroitAudio.Indexing/DetroitAudio.Indexing.csproj" />
+    <Project Path="src/DetroitAudio.Audio/DetroitAudio.Audio.csproj" />
+    <Project Path="src/DetroitAudio.Export/DetroitAudio.Export.csproj" />
+    <Project Path="src/DetroitAudio.Desktop/DetroitAudio.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DetroitAudio.Desktop.Tests/DetroitAudio.Desktop.Tests.csproj" />
+    <Project Path="tests/DetroitAudio.Tests/DetroitAudio.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/DetroitAudio.Inspect/DetroitAudio.Inspect.csproj" />
+    <Project Path="tools/DetroitAudio.UiCheck/DetroitAudio.UiCheck.csproj" />
+  </Folder>
+</Solution>

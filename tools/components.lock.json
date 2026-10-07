@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "name": "vgmstream",
+      "version": "r2117-298-g7dc938fa",
+      "url": "https://github.com/vgmstream/vgmstream-releases/releases/download/nightly/vgmstream-win64.zip",
+      "sha256": "51dd830707225fc46706742af321b03ccd98206ca660397caec0692760c8d4e7",
+      "archive": "zip",
+      "license": "ISC-style",
+      "source": "https://github.com/vgmstream/vgmstream/tree/7dc938fa",
+      "files": [
+        "vgmstream-cli.exe",
+        "libvorbis.dll"
+      ],
+      "sourceArchive": "https://github.com/vgmstream/vgmstream/archive/7dc938fa.zip",
+      "sourceSha256": "7618962679274a1d3b7da886d82365628ad15af55be8937db2f6df322643606f",
+      "profile": "Vorbis and built-in codecs; optional codecs disabled"
+    },
+    {
+      "name": "ffmpeg",
+      "version": "n8.1.3-14-g330caae0c1",
+      "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-01-13-06/ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-shared-8.1.zip",
+      "sha256": "bf545d8fee9bb6957c1f3dea0f384bf64edead407d763326dbbd2de1b04768a4",
+      "archive": "zip",
+      "license": "LGPL-3.0-or-later",
+      "source": "https://github.com/FFmpeg/FFmpeg/tree/330caae0c1",
+      "build": "https://github.com/BtbN/FFmpeg-Builds",
+      "files": [
+        "ffmpeg.exe",
+        "ffprobe.exe",
+        "avcodec-62.dll",
+        "avdevice-62.dll",
+        "avfilter-11.dll",
+        "avformat-62.dll",
+        "avutil-60.dll",
+        "swresample-6.dll",
+        "swscale-9.dll"
+      ]
+    },
+    {
+      "name": "ww2ogg",
+      "version": "0.24",
+      "url": "https://github.com/hcs64/ww2ogg/releases/download/0.24/ww2ogg024.zip",
+      "sha256": "cb90dbcc45160e0c435a4d83f59f678337c069e5551618e6b1c46254e7aef59f",
+      "archive": "zip",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/hcs64/ww2ogg",
+      "files": [
+        "ww2ogg.exe",
+        "packed_codebooks.bin",
+        "packed_codebooks_aoTuV_603.bin"
+      ]
+    },
+    {
+      "name": "revorb",
+      "version": "1.0",
+      "url": "https://github.com/ItsBranK/ReVorb/releases/download/v1.0/ReVorb.exe",
+      "sha256": "065d95aa0681c0fb275216dc20621756f4cbe45b85c1b65b0bde9c3720cd2374",
+      "archive": "exe",
+      "license": "ISC-style",
+      "source": "https://github.com/ItsBranK/ReVorb",
+      "files": [
+        "ReVorb.exe"
+      ]
+    }
+  ]
+}

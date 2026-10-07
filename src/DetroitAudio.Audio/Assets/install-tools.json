@@ -1,0 +1,110 @@
+[
+  {
+    "Name": "vgmstream",
+    "DisplayName": "Audio decoder",
+    "Version": "r2117-298-g7dc938fa",
+    "Url": null,
+    "Archive": "zip",
+    "Sha256": "C06109C882DF8ADD331EB0BA1522DDE5383A783DD35DA9790A68835DF103143D",
+    "Files": [
+      {
+        "Path": "vgmstream-cli.exe",
+        "Sha256": "E3C3D8F0EDA6C2235909D1C199D0F36233845B46A88D9A88B10A1FD01CC58EF7"
+      },
+      {
+        "Path": "libvorbis.dll",
+        "Sha256": "5F330A20B19B3C70DC43EEDCC95891E65940FCA04A77155C573EFCDD4C2CA665"
+      }
+    ],
+    "SeedArchive": "DetroitAudio.Audio.Assets.tool-seeds.zip",
+    "SeedPath": "vgmstream"
+  },
+  {
+    "Name": "ffmpeg",
+    "DisplayName": "Audio conversion",
+    "Version": "n8.1.3-14-g330caae0c1",
+    "Url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-01-13-06/ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-shared-8.1.zip",
+    "Archive": "zip",
+    "Sha256": "bf545d8fee9bb6957c1f3dea0f384bf64edead407d763326dbbd2de1b04768a4",
+    "Files": [
+      {
+        "Path": "ffmpeg.exe",
+        "Sha256": "1D93F786E551355D070F4622BF4CD0F1C990EB6769A1C1AB7B18CF0E638E9F97"
+      },
+      {
+        "Path": "ffprobe.exe",
+        "Sha256": "C55888785A631B4E72EC9A7970D9C62678A493D9650A2F92F47C1CF722EED569"
+      },
+      {
+        "Path": "avcodec-62.dll",
+        "Sha256": "E7F1183E43425B75A14A4A781F8D2CF29DE9AC8238C890F464E7DDCD14633055"
+      },
+      {
+        "Path": "avdevice-62.dll",
+        "Sha256": "B7FF7864DD1DC7E82F26E0C5A65F54BAD158ECCDE6C607005BDAC5F6F7392F68"
+      },
+      {
+        "Path": "avfilter-11.dll",
+        "Sha256": "D854A2C4F7E7585F961FEA1D3D55EA467AFD858FD5D8EC89F58D7223279B1E74"
+      },
+      {
+        "Path": "avformat-62.dll",
+        "Sha256": "30062C7315EC600A97EE731DD05C2F3D8D701D60874541DC0338B8731523C4FF"
+      },
+      {
+        "Path": "avutil-60.dll",
+        "Sha256": "88BEFD1B2F4F07EC73617FA75CFC5E8175915F70A69E58115C1E1D4EE0035A1E"
+      },
+      {
+        "Path": "swresample-6.dll",
+        "Sha256": "8D71F620D188E18AADF931550C8867DB8969BE015221E7D3C705F72D6C192A87"
+      },
+      {
+        "Path": "swscale-9.dll",
+        "Sha256": "73175A6691158584AEE3FD0DC93726FA66E428B41830E1A10ADC0D022821BDF7"
+      }
+    ],
+    "SeedArchive": null,
+    "SeedPath": null
+  },
+  {
+    "Name": "ww2ogg",
+    "DisplayName": "Vorbis export",
+    "Version": "0.24",
+    "Url": null,
+    "Archive": "zip",
+    "Sha256": "C06109C882DF8ADD331EB0BA1522DDE5383A783DD35DA9790A68835DF103143D",
+    "Files": [
+      {
+        "Path": "ww2ogg.exe",
+        "Sha256": "D6ADD987C147707A751E197DA74B2B897D2C8A820F2D43A48DDABFCE245250BD"
+      },
+      {
+        "Path": "packed_codebooks.bin",
+        "Sha256": "442E9442AAD0BBD263DF4D721D6747A74D440C899978B1FAB984BCBF455FD592"
+      },
+      {
+        "Path": "packed_codebooks_aoTuV_603.bin",
+        "Sha256": "00A93EAB267D281401B1EFD54E888A2E183299B9E6C446C48D09F701A89D9D27"
+      }
+    ],
+    "SeedArchive": "DetroitAudio.Audio.Assets.tool-seeds.zip",
+    "SeedPath": "ww2ogg"
+  },
+  {
+    "Name": "revorb",
+    "DisplayName": "OGG repair",
+    "Version": "1.0",
+    "Url": null,
+    "Archive": "zip",
+    "Sha256": "C06109C882DF8ADD331EB0BA1522DDE5383A783DD35DA9790A68835DF103143D",
+    "Files": [
+      {
+        "Path": "ReVorb.exe",
+        "Sha256": "065D95AA0681C0FB275216DC20621756F4CBE45B85C1B65B0BDE9C3720CD2374"
+      }
+    ],
+    "SeedArchive": "DetroitAudio.Audio.Assets.tool-seeds.zip",
+    "SeedPath": "revorb"
+  }
+]

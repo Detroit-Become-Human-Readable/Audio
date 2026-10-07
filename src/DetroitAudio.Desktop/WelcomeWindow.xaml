@@ -1,0 +1,37 @@
+<Window x:Class="DetroitAudio.Desktop.WelcomeWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Detroit Audio Browser" Width="860" Height="735" MinWidth="760" MinHeight="650" WindowStartupLocation="CenterScreen">
+  <Window.Style><Style TargetType="Window" BasedOn="{StaticResource {x:Type Window}}" /></Window.Style>
+  <Grid Background="{DynamicResource BackgroundBrush}">
+    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel x:Name="WelcomeContent" Margin="42,25,42,20">
+        <Grid Height="150" Margin="0,0,0,4">
+          <Ellipse Width="145" Height="145" Opacity="0.12"><Ellipse.Fill><RadialGradientBrush><GradientStop Color="#749FFF" Offset="0" /><GradientStop Color="#00749FFF" Offset="1" /></RadialGradientBrush></Ellipse.Fill></Ellipse>
+          <Image x:Name="WelcomeLogo" Source="Assets/Logo.png" Width="116" Height="116" Stretch="Uniform" RenderTransformOrigin="0.5,0.5" AutomationProperties.Name="Detroit logo"><Image.RenderTransform><ScaleTransform x:Name="LogoScale" ScaleX="1" ScaleY="1" /></Image.RenderTransform></Image>
+        </Grid>
+        <TextBlock Text="Welcome to Detroit Audio Browser" Style="{DynamicResource HeadingTextStyle}" FontSize="27" HorizontalAlignment="Center" />
+        <TextBlock Text="Set up your tools and open your game." Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,23" />
+        <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="0" Padding="20,16" Margin="0,0,0,14">
+          <StackPanel>
+            <DockPanel><Border Background="{DynamicResource SelectedBrush}" CornerRadius="0" Width="28" Height="28" DockPanel.Dock="Left" Margin="0,0,12,0"><TextBlock Text="1" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Text="Audio tools" Style="{DynamicResource HeadingTextStyle}" FontSize="17" VerticalAlignment="Center" /><TextBlock Text="{Binding ToolStatus}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" /></DockPanel>
+            <ItemsControl ItemsSource="{Binding Tools}" Margin="40,12,0,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Margin="0,0,18,6"><TextBlock Text="●" Margin="0,0,6,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#8490A5" /><Style.Triggers><DataTrigger Binding="{Binding Ready}" Value="True"><Setter Property="Foreground" Value="#80C9AF" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock><TextBlock Text="{Binding DisplayName}" FontSize="12" Foreground="{DynamicResource MutedBrush}" /></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            <ProgressBar Height="5" Margin="40,12,0,3" Maximum="100" Value="{Binding Progress}" IsIndeterminate="{Binding Indeterminate}" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource BorderBrush}" />
+            <TextBlock Text="{Binding SetupError}" TextWrapping="Wrap" Foreground="#F0B69D" Margin="40,10,0,0" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,7,0,0">
+              <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding ToolsReady}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+              <Button Content="Folder" Command="{Binding BrowseToolsFolderCommand}" /><Button Content="Retry" Command="{Binding RetryCommand}" /><Button Content="Cancel" Command="{Binding CancelCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="0" Padding="20,16">
+          <StackPanel>
+            <DockPanel><Border Background="{DynamicResource SelectedBrush}" CornerRadius="0" Width="28" Height="28" DockPanel.Dock="Left" Margin="0,0,12,0"><TextBlock Text="2" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Text="Game folder" Style="{DynamicResource HeadingTextStyle}" FontSize="17" VerticalAlignment="Center" /><TextBlock Text="{Binding GameStatus}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right" /></DockPanel>
+            <Grid Margin="40,13,0,9"><Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Installations.Count}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Grid.Style><ComboBox x:Name="DetectedGames" ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation}" DisplayMemberPath="Path" AutomationProperties.Name="Detected installations"><ComboBox.Style><Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding Installations.Count}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></ComboBox.Style></ComboBox><TextBlock Text="Choose an installation" Foreground="{DynamicResource MutedBrush}" Margin="11,0,32,0" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding SelectedInstallation}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
+            <Grid Margin="40,5,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="GameFolderBox" Text="{Binding SelectedSource,UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Game folder" /><Button Grid.Column="1" Content="Browse" Command="{Binding BrowseGameCommand}" Margin="8,0,0,0" /></Grid>
+            <Button Content="Open an archive instead" Command="{Binding BrowseFileCommand}" HorizontalAlignment="Left" Margin="37,9,0,0" Padding="6,4" Background="Transparent" BorderThickness="0" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="42,15"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><CheckBox Content="Show at startup" IsChecked="{Binding ShowAtStartup}" Foreground="{DynamicResource MutedBrush}" Margin="0,0,20,0" /><CheckBox Content="Reduce motion" IsChecked="{Binding ReduceMotion}" Foreground="{DynamicResource MutedBrush}" /></StackPanel><Button x:Name="OpenLibraryButton" Grid.Column="1" Content="{Binding OpenLabel}" IsEnabled="{Binding CanOpen}" Background="{DynamicResource AccentBrush}" Click="OpenLibrary" IsDefault="True" Padding="24,10" /></Grid></Border>
+  </Grid>
+</Window>

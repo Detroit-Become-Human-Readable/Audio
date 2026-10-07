@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <AutoPublish Condition="'$(AutoPublish)' == ''">true</AutoPublish>
+    <AutoPublishScript Condition="'$(AutoPublishScript)' == ''">$(MSBuildThisFileDirectory)..\scripts\Publish.ps1</AutoPublishScript>
+    <AutoPublishOutputDirectory Condition="'$(AutoPublishOutputDirectory)' == ''">$(MSBuildThisFileDirectory)..\artifacts\DetroitAudio</AutoPublishOutputDirectory>
+    <AutoPublishToolsDirectory Condition="'$(AutoPublishToolsDirectory)' == ''">$(MSBuildThisFileDirectory)..\.local\tools</AutoPublishToolsDirectory>
+    <AutoPublishPackagesPath Condition="'$(AutoPublishPackagesPath)' == ''">$(NuGetPackageRoot)</AutoPublishPackagesPath>
+    <AutoPublishPowerShellExecutable Condition="'$(AutoPublishPowerShellExecutable)' == ''">powershell.exe</AutoPublishPowerShellExecutable>
+  </PropertyGroup>
+  <Target Name="AutoPublishDesktop" AfterTargets="Build"
+          Condition="'$(AutoPublish)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(OS)' == 'Windows_NT'">
+    <PropertyGroup>
+      <_AutoPublishPackagesPath>$(AutoPublishPackagesPath.Replace('\', '/'))</_AutoPublishPackagesPath>
+    </PropertyGroup>
+    <Message Importance="high" Text="Publishing Detroit Audio ($(Configuration)) to $(AutoPublishOutputDirectory)" />
+    <Exec EnvironmentVariables="PSModulePath=" Command="&quot;$(AutoPublishPowerShellExecutable)&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(AutoPublishScript)&quot; -Configuration &quot;$(Configuration)&quot; -ToolsDirectory &quot;$(AutoPublishToolsDirectory)&quot; -OutputDirectory &quot;$(AutoPublishOutputDirectory)&quot; -PackagesPath &quot;$(_AutoPublishPackagesPath)&quot;" />
+  </Target>
+</Project>
